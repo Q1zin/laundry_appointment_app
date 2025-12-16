@@ -7,8 +7,8 @@ import ProfileIcon from '@/components/icons/ProfileIcon.vue'
 const steps = [
   {
     number: 1,
-    title: 'ВЫБЕРИ МАШИНКУ',
-    icon: WashingMachineOutlineIcon,
+    title: 'РЕГИСТРАЦИЯ',
+    icon: ProfileIcon,
     color: '#C8A090'
   },
   {
@@ -19,8 +19,8 @@ const steps = [
   },
   {
     number: 3,
-    title: 'ВВЕДИ ДАННЫЕ',
-    icon: ProfileIcon,
+    title: 'ВЫБЕРИ МАШИНКУ',
+    icon: WashingMachineOutlineIcon,
     color: '#6B7B8F'
   }
 ]
