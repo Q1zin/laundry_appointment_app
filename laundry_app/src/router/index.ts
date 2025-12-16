@@ -6,18 +6,27 @@ const routes: RouteRecordRaw[] = [
     path: '/',
     name: 'Login',
     component: () => import('@/pages/LoginPage.vue')
+  },
+  {
+    path: '/home',
+    name: 'Home',
+    component: () => import('@/pages/HomePage.vue')
   }
   // Здесь будут добавляться новые страницы
-  // {
-  //   path: '/dashboard',
-  //   name: 'Dashboard',
-  //   component: () => import('@/pages/DashboardPage.vue')
-  // }
 ]
 
 const router = createRouter({
   history: createWebHistory(),
-  routes
+  routes,
+  scrollBehavior(to) {
+    if (to.hash) {
+      return {
+        el: to.hash,
+        behavior: 'smooth'
+      }
+    }
+    return { top: 0 }
+  }
 })
 
 export default router
