@@ -4,13 +4,14 @@ import WashingMachineOutlineIcon from '@/components/icons/WashingMachineOutlineI
 import UserIcon from '@/components/icons/UserIcon.vue'
 import KeyIcon from '@/components/icons/KeyIcon.vue'
 import { useAuth } from '@/composables/useAuth'
-import { useBookings } from '@/composables/useBookings'
+import { useBookings, type Booking } from '@/composables/useBookings'
 import { useMachines } from '@/composables/useMachines'
 import { useSchedule } from '@/composables/useSchedule'
 import { useBodyScrollLock } from '@/composables/useBodyScrollLock'
 
 const props = defineProps<{
   isOpen: boolean
+  editBooking?: Booking | null
 }>()
 
 useBodyScrollLock(toRef(props, 'isOpen'))
@@ -20,7 +21,7 @@ const emit = defineEmits<{
 }>()
 
 const { user } = useAuth()
-const { addBooking } = useBookings()
+const { addBooking, updateBooking } = useBookings()
 const { machines, getActiveMachines } = useMachines()
 const { isSlotBlocked } = useSchedule()
 
@@ -31,14 +32,33 @@ const selectedTimeIndex = ref<number | null>(null)
 const fullName = ref('')
 const roomNumber = ref('')
 
-// Initialize from user data
+// Режим редактирования
+const isEditMode = computed(() => !!props.editBooking)
+
+// Initialize from user data or edit booking
 watch(() => props.isOpen, (isOpen) => {
-  if (isOpen && user.value) {
-    fullName.value = user.value.fullName || ''
-    roomNumber.value = user.value.room || ''
-    // Сброс выбора при открытии
-    selectedMachine.value = null
-    selectedTimeIndex.value = null
+  if (isOpen) {
+    if (props.editBooking) {
+      // Режим редактирования - заполняем из существующей записи
+      selectedMachine.value = props.editBooking.machine
+      fullName.value = props.editBooking.fullName || ''
+      roomNumber.value = props.editBooking.room || ''
+      
+      // Находим индекс даты
+      const dateIndex = dates.value.findIndex(d => d.dateStr === props.editBooking!.date)
+      selectedDateIndex.value = dateIndex >= 0 ? dateIndex : 0
+      
+      // Находим индекс времени
+      const timeIndex = timeSlots.findIndex(t => t === props.editBooking!.time)
+      selectedTimeIndex.value = timeIndex >= 0 ? timeIndex : null
+    } else if (user.value) {
+      // Новая запись
+      fullName.value = user.value.fullName || ''
+      roomNumber.value = user.value.room || ''
+      selectedMachine.value = null
+      selectedTimeIndex.value = null
+      selectedDateIndex.value = 0
+    }
   }
 }, { immediate: true })
 
@@ -119,7 +139,7 @@ const handleSubmit = () => {
 
   const machine = activeMachines.value.find(m => m.id === selectedMachine.value)
   
-  addBooking({
+  const bookingData = {
     machine: selectedMachine.value!,
     machineName: machine?.name,
     date: selectedDate.dateStr,
@@ -129,7 +149,13 @@ const handleSubmit = () => {
     fullName: fullName.value,
     room: roomNumber.value,
     userEmail: user.value?.email
-  })
+  }
+
+  if (isEditMode.value && props.editBooking) {
+    updateBooking(props.editBooking.id, bookingData)
+  } else {
+    addBooking(bookingData)
+  }
   
   closeModal()
 }
@@ -147,7 +173,7 @@ const handleSubmit = () => {
           </button>
 
           <!-- Title -->
-          <h2 class="modal-title">ЗАПИСЬ НА СТИРКУ</h2>
+          <h2 class="modal-title">{{ isEditMode ? 'ПЕРЕНОС ЗАПИСИ' : 'ЗАПИСЬ НА СТИРКУ' }}</h2>
           <div class="title-divider"></div>
 
           <!-- Date Selection -->
@@ -233,7 +259,7 @@ const handleSubmit = () => {
             :disabled="!canSubmit"
             @click="handleSubmit"
           >
-            ЗАПИСАТЬСЯ
+            {{ isEditMode ? 'ПЕРЕНЕСТИ' : 'ЗАПИСАТЬСЯ' }}
           </button>
         </div>
       </div>

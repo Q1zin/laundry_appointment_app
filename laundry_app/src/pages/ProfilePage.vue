@@ -7,14 +7,16 @@ import BookingModal from '@/components/modals/BookingModal.vue'
 import WashingMachineOutlineIcon from '@/components/icons/WashingMachineOutlineIcon.vue'
 import CalendarIcon from '@/components/icons/CalendarIcon.vue'
 import TrashIcon from '@/components/icons/TrashIcon.vue'
+import EditIcon from '@/components/icons/EditIcon.vue'
 import { useAuth } from '@/composables/useAuth'
-import { useBookings } from '@/composables/useBookings'
+import { useBookings, type Booking } from '@/composables/useBookings'
 
 const router = useRouter()
 const { isLoggedIn, user, logout, deleteAccount } = useAuth()
 const { activeBookings, cancelBooking, clearAllBookings } = useBookings()
 
 const isBookingModalOpen = ref(false)
+const editingBooking = ref<Booking | null>(null)
 
 // Редирект если не авторизован
 onMounted(() => {
@@ -49,11 +51,18 @@ const handleDeleteAccount = () => {
 }
 
 const openBookingModal = () => {
+  editingBooking.value = null
+  isBookingModalOpen.value = true
+}
+
+const openEditBookingModal = (booking: Booking) => {
+  editingBooking.value = booking
   isBookingModalOpen.value = true
 }
 
 const closeBookingModal = () => {
   isBookingModalOpen.value = false
+  editingBooking.value = null
 }
 </script>
 
@@ -125,13 +134,22 @@ const closeBookingModal = () => {
                 </div>
                 <div class="booking-room">Комната: {{ booking.room }}</div>
               </div>
-              <button 
-                class="cancel-btn" 
-                @click="handleCancelBooking(booking.id)"
-                title="Отменить запись"
-              >
-                <TrashIcon :size="20" color="#EF4444" />
-              </button>
+              <div class="booking-actions">
+                <button 
+                  class="edit-btn" 
+                  @click="openEditBookingModal(booking)"
+                  title="Перенести запись"
+                >
+                  <EditIcon :size="20" color="#3B82F6" />
+                </button>
+                <button 
+                  class="cancel-btn" 
+                  @click="handleCancelBooking(booking.id)"
+                  title="Отменить запись"
+                >
+                  <TrashIcon :size="20" color="#EF4444" />
+                </button>
+              </div>
             </div>
           </div>
         </section>
@@ -157,6 +175,7 @@ const closeBookingModal = () => {
 
     <BookingModal 
       :is-open="isBookingModalOpen" 
+      :edit-booking="editingBooking"
       @close="closeBookingModal" 
     />
   </div>
@@ -306,6 +325,29 @@ const closeBookingModal = () => {
 .booking-room {
   font-size: 14px;
   color: #9CA3AF;
+}
+
+.booking-actions {
+  display: flex;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.edit-btn {
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: #DBEAFE;
+  border-radius: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s;
+}
+
+.edit-btn:hover {
+  background: #BFDBFE;
 }
 
 .cancel-btn {

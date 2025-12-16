@@ -110,11 +110,48 @@ export function useBookings() {
     localStorage.removeItem(BOOKINGS_KEY)
   }
 
+  const updateBooking = (bookingId: string, bookingData: Omit<Booking, 'id' | 'createdAt'>) => {
+    const index = bookings.value.findIndex(b => b.id === bookingId)
+    if (index !== -1) {
+      const updatedBooking: Booking = {
+        ...bookingData,
+        id: bookingId,
+        createdAt: bookings.value[index].createdAt
+      }
+      bookings.value[index] = updatedBooking
+      saveToStorage()
+      
+      // Также обновляем в общем списке для админа
+      try {
+        const allBookingsStr = localStorage.getItem(ALL_BOOKINGS_KEY)
+        if (allBookingsStr) {
+          const allBookings = JSON.parse(allBookingsStr)
+          const allIndex = allBookings.findIndex((b: Booking) => b.id === bookingId)
+          if (allIndex !== -1) {
+            allBookings[allIndex] = updatedBooking
+            localStorage.setItem(ALL_BOOKINGS_KEY, JSON.stringify(allBookings))
+          }
+        }
+      } catch {
+        // ignore
+      }
+      
+      return updatedBooking
+    }
+    return null
+  }
+
+  const getBookingById = (bookingId: string) => {
+    return bookings.value.find(b => b.id === bookingId) || null
+  }
+
   return {
     bookings,
     activeBookings,
     addBooking,
     cancelBooking,
-    clearAllBookings
+    clearAllBookings,
+    updateBooking,
+    getBookingById
   }
 }
