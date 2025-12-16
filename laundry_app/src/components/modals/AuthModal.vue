@@ -10,6 +10,7 @@ import IdCardIcon from '@/components/icons/IdCardIcon.vue'
 import HomeIcon from '@/components/icons/HomeIcon.vue'
 import GroupIcon from '@/components/icons/GroupIcon.vue'
 import DocumentIcon from '@/components/icons/DocumentIcon.vue'
+import { useAuth } from '@/composables/useAuth'
 
 const props = defineProps<{
   isOpen: boolean
@@ -17,7 +18,10 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   close: []
+  success: []
 }>()
+
+const { login, register } = useAuth()
 
 type AuthMode = 'login' | 'register'
 const mode = ref<AuthMode>('login')
@@ -48,6 +52,45 @@ const handleOverlayClick = (e: MouseEvent) => {
   if (e.target === e.currentTarget) {
     closeModal()
   }
+}
+
+const handleLogin = () => {
+  if (!loginUsername.value || !loginPassword.value) return
+  
+  login(loginUsername.value, loginPassword.value)
+  loginUsername.value = ''
+  loginPassword.value = ''
+  emit('success')
+  closeModal()
+}
+
+const handleRegister = () => {
+  if (!regUsername.value || !regEmail.value || !regFullName.value || 
+      !regGroup.value || !regRoom.value || !regContract.value || 
+      !regPassword.value || regPassword.value !== regPasswordConfirm.value) return
+  
+  register({
+    username: regUsername.value,
+    email: regEmail.value,
+    fullName: regFullName.value,
+    group: regGroup.value,
+    room: regRoom.value,
+    contract: regContract.value,
+    password: regPassword.value
+  })
+  
+  // Reset form
+  regUsername.value = ''
+  regEmail.value = ''
+  regFullName.value = ''
+  regGroup.value = ''
+  regRoom.value = ''
+  regContract.value = ''
+  regPassword.value = ''
+  regPasswordConfirm.value = ''
+  
+  emit('success')
+  closeModal()
 }
 </script>
 
@@ -100,7 +143,7 @@ const handleOverlayClick = (e: MouseEvent) => {
               </BaseInput>
             </div>
 
-            <BaseButton class="submit-btn">ВОЙТИ</BaseButton>
+            <BaseButton class="submit-btn" @click="handleLogin">ВОЙТИ</BaseButton>
           </form>
 
           <!-- Register Form -->
@@ -139,7 +182,7 @@ const handleOverlayClick = (e: MouseEvent) => {
               </BaseInput>
             </div>
 
-            <BaseButton class="submit-btn">ЗАРЕГИСТРИРОВАТЬСЯ</BaseButton>
+            <BaseButton class="submit-btn" @click="handleRegister">ЗАРЕГИСТРИРОВАТЬСЯ</BaseButton>
           </form>
         </div>
       </div>

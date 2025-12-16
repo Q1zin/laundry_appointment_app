@@ -2,6 +2,7 @@
 defineProps<{
   variant?: 'light' | 'dark'
   isLoggedIn?: boolean
+  userName?: string
 }>()
 
 const emit = defineEmits<{
@@ -17,13 +18,15 @@ const emit = defineEmits<{
       <nav class="nav">
         <a href="#rules" class="nav-link">ПРАВИЛА</a>
         <a href="#booking" class="nav-link">ЗАПИСЬ</a>
-        <button 
-          v-if="isLoggedIn" 
-          class="logout-btn" 
-          @click="emit('logoutClick')"
-        >
-          ВЫХОД
-        </button>
+        <template v-if="isLoggedIn">
+          <span class="user-name">{{ userName }}</span>
+          <button 
+            class="logout-btn" 
+            @click="emit('logoutClick')"
+          >
+            ВЫХОД
+          </button>
+        </template>
         <button 
           v-else 
           class="login-btn" 
@@ -90,6 +93,16 @@ const emit = defineEmits<{
 
 .nav-link:hover {
   opacity: 0.7;
+}
+
+.user-name {
+  color: #3D4F61;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.header.dark .user-name {
+  color: #FFFFFF;
 }
 
 .logout-btn,
