@@ -4,6 +4,7 @@ import WashingMachineOutlineIcon from '@/components/icons/WashingMachineOutlineI
 import UserIcon from '@/components/icons/UserIcon.vue'
 import KeyIcon from '@/components/icons/KeyIcon.vue'
 import { useAuth } from '@/composables/useAuth'
+import { useBookings } from '@/composables/useBookings'
 import { useBodyScrollLock } from '@/composables/useBodyScrollLock'
 
 const props = defineProps<{
@@ -17,6 +18,7 @@ const emit = defineEmits<{
 }>()
 
 const { user } = useAuth()
+const { addBooking } = useBookings()
 
 // Form state
 const selectedMachine = ref<number>(1)
@@ -34,14 +36,14 @@ if (user.value) {
 // Generate dates for next 7 days
 const dates = computed(() => {
   const days = ['ВС', 'ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ']
-  const result = []
+  const result: { dayName: string; dayNumber: number }[] = []
   const today = new Date()
   
   for (let i = 0; i < 7; i++) {
     const date = new Date(today)
     date.setDate(today.getDate() + i)
     result.push({
-      dayName: days[date.getDay()],
+      dayName: days[date.getDay()] || 'ВС',
       dayNumber: date.getDate()
     })
   }
@@ -66,14 +68,22 @@ const handleOverlayClick = (e: MouseEvent) => {
 }
 
 const handleSubmit = () => {
-  // TODO: отправка формы
-  console.log({
+  const selectedDate = dates.value[selectedDateIndex.value]
+  if (!selectedDate) return
+  
+  const time = timeSlots[selectedTimeIndex.value]
+  if (!time) return
+  
+  addBooking({
     machine: selectedMachine.value,
-    date: dates.value[selectedDateIndex.value],
-    time: timeSlots[selectedTimeIndex.value],
+    date: `${selectedDate.dayNumber}`,
+    dayName: selectedDate.dayName,
+    dayNumber: selectedDate.dayNumber,
+    time: time,
     fullName: fullName.value,
     room: roomNumber.value
   })
+  
   closeModal()
 }
 </script>

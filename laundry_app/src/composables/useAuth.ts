@@ -1,11 +1,11 @@
 import { ref, computed } from 'vue'
 
 interface User {
-  username: string
   fullName: string
   email: string
   group: string
   room: string
+  contract: string
 }
 
 const TOKEN_KEY = 'auth_token'
@@ -61,14 +61,14 @@ export function useAuth() {
 
   const isLoggedIn = computed(() => !!token.value && !!user.value)
 
-  const login = (username: string, _password: string) => {
+  const login = (email: string, _password: string) => {
     // Фейковый логин - просто создаём пользователя
     const fakeUser: User = {
-      username,
       fullName: 'Иванов Иван Иванович',
-      email: `${username}@student.edu`,
+      email: email,
       group: '23212',
-      room: '107М'
+      room: '107М',
+      contract: '123456789'
     }
 
     const fakeToken = generateFakeToken()
@@ -83,7 +83,6 @@ export function useAuth() {
   }
 
   const register = (userData: {
-    username: string
     email: string
     fullName: string
     group: string
@@ -92,11 +91,11 @@ export function useAuth() {
     password: string
   }) => {
     const newUser: User = {
-      username: userData.username,
       fullName: userData.fullName,
       email: userData.email,
       group: userData.group,
-      room: userData.room
+      room: userData.room,
+      contract: userData.contract
     }
 
     const fakeToken = generateFakeToken()
@@ -117,12 +116,18 @@ export function useAuth() {
     localStorage.removeItem(USER_KEY)
   }
 
+  const deleteAccount = () => {
+    logout()
+    // В реальном приложении здесь был бы запрос на сервер
+  }
+
   return {
     user,
     token,
     isLoggedIn,
     login,
     register,
-    logout
+    logout,
+    deleteAccount
   }
 }

@@ -3,7 +3,6 @@ import { ref, toRef } from 'vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import WashingMachineIcon from '@/components/icons/WashingMachineIcon.vue'
-import UserIcon from '@/components/icons/UserIcon.vue'
 import LockIcon from '@/components/icons/LockIcon.vue'
 import EmailIcon from '@/components/icons/EmailIcon.vue'
 import IdCardIcon from '@/components/icons/IdCardIcon.vue'
@@ -30,11 +29,10 @@ type AuthMode = 'login' | 'register'
 const mode = ref<AuthMode>('login')
 
 // Login form
-const loginUsername = ref('')
+const loginEmail = ref('')
 const loginPassword = ref('')
 
 // Register form
-const regUsername = ref('')
 const regEmail = ref('')
 const regFullName = ref('')
 const regGroup = ref('')
@@ -58,22 +56,21 @@ const handleOverlayClick = (e: MouseEvent) => {
 }
 
 const handleLogin = () => {
-  if (!loginUsername.value || !loginPassword.value) return
+  if (!loginEmail.value || !loginPassword.value) return
   
-  login(loginUsername.value, loginPassword.value)
-  loginUsername.value = ''
+  login(loginEmail.value, loginPassword.value)
+  loginEmail.value = ''
   loginPassword.value = ''
   emit('success')
   closeModal()
 }
 
 const handleRegister = () => {
-  if (!regUsername.value || !regEmail.value || !regFullName.value || 
+  if (!regEmail.value || !regFullName.value || 
       !regGroup.value || !regRoom.value || !regContract.value || 
       !regPassword.value || regPassword.value !== regPasswordConfirm.value) return
   
   register({
-    username: regUsername.value,
     email: regEmail.value,
     fullName: regFullName.value,
     group: regGroup.value,
@@ -83,7 +80,6 @@ const handleRegister = () => {
   })
   
   // Reset form
-  regUsername.value = ''
   regEmail.value = ''
   regFullName.value = ''
   regGroup.value = ''
@@ -137,8 +133,8 @@ const handleRegister = () => {
           <!-- Login Form -->
           <form v-if="mode === 'login'" class="auth-form" @submit.prevent>
             <div class="form-fields">
-              <BaseInput v-model="loginUsername" placeholder="Username">
-                <template #icon><UserIcon /></template>
+              <BaseInput v-model="loginEmail" type="email" placeholder="Email">
+                <template #icon><EmailIcon /></template>
               </BaseInput>
 
               <BaseInput v-model="loginPassword" type="password" placeholder="Пароль">
@@ -152,10 +148,6 @@ const handleRegister = () => {
           <!-- Register Form -->
           <form v-else class="auth-form" @submit.prevent>
             <div class="form-fields">
-              <BaseInput v-model="regUsername" placeholder="Username">
-                <template #icon><UserIcon /></template>
-              </BaseInput>
-
               <BaseInput v-model="regEmail" type="email" placeholder="Email">
                 <template #icon><EmailIcon /></template>
               </BaseInput>

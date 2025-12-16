@@ -9,12 +9,12 @@ import AuthModal from '@/components/modals/AuthModal.vue'
 import BookingModal from '@/components/modals/BookingModal.vue'
 import { useAuth } from '@/composables/useAuth'
 
-const { isLoggedIn, user, logout } = useAuth()
+const { isLoggedIn, user } = useAuth()
 
 const isAuthModalOpen = ref(false)
 const isBookingModalOpen = ref(false)
 
-const userName = computed(() => user.value?.fullName || user.value?.username || '')
+const userEmail = computed(() => user.value?.email || '')
 
 const openAuthModal = () => {
   isAuthModalOpen.value = true
@@ -40,8 +40,11 @@ const handleBookingClick = () => {
   }
 }
 
-const handleLogout = () => {
-  logout()
+const scrollToRules = () => {
+  const element = document.getElementById('rules')
+  if (element) {
+    element.scrollIntoView({ behavior: 'smooth' })
+  }
 }
 </script>
 
@@ -49,10 +52,10 @@ const handleLogout = () => {
   <div class="home-page">
     <TheHeader 
       :is-logged-in="isLoggedIn"
-      :user-name="userName"
+      :user-email="userEmail"
       @login-click="openAuthModal"
-      @logout-click="handleLogout"
       @booking-click="handleBookingClick"
+      @rules-click="scrollToRules"
     />
     <main>
       <HeroSection @booking-click="handleBookingClick" />

@@ -6,8 +6,12 @@ const routes: RouteRecordRaw[] = [
     path: '/',
     name: 'Home',
     component: () => import('@/pages/HomePage.vue')
+  },
+  {
+    path: '/profile',
+    name: 'Profile',
+    component: () => import('@/pages/ProfilePage.vue')
   }
-  // Здесь будут добавляться новые страницы
 ]
 
 const router = createRouter({

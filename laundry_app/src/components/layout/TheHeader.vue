@@ -1,14 +1,16 @@
 <script setup lang="ts">
+import { RouterLink } from 'vue-router'
+
 defineProps<{
   variant?: 'light' | 'dark'
   isLoggedIn?: boolean
-  userName?: string
+  userEmail?: string
 }>()
 
 const emit = defineEmits<{
   loginClick: []
-  logoutClick: []
   bookingClick: []
+  rulesClick: []
 }>()
 
 const scrollToSection = (id: string) => {
@@ -22,18 +24,14 @@ const scrollToSection = (id: string) => {
 <template>
   <header class="header" :class="variant || 'light'">
     <div class="header-content">
-      <div class="logo">СТИРКА-</div>
+      <RouterLink to="/" class="logo">СТИРКА</RouterLink>
       <nav class="nav">
-        <button class="nav-link nav-btn" @click="scrollToSection('rules')">ПРАВИЛА</button>
+        <button class="nav-link nav-btn" @click="emit('rulesClick')">ПРАВИЛА</button>
         <button class="nav-link nav-btn" @click="emit('bookingClick')">ЗАПИСЬ</button>
         <template v-if="isLoggedIn">
-          <span class="user-name">{{ userName }}</span>
-          <button 
-            class="logout-btn" 
-            @click="emit('logoutClick')"
-          >
-            ВЫХОД
-          </button>
+          <RouterLink to="/profile" class="profile-link">
+            {{ userEmail }}
+          </RouterLink>
         </template>
         <button 
           v-else 
@@ -75,6 +73,7 @@ const scrollToSection = (id: string) => {
   font-size: 30px;
   font-weight: bold;
   color: #3D4F61;
+  text-decoration: none;
 }
 
 .header.dark .logo {
@@ -110,17 +109,40 @@ const scrollToSection = (id: string) => {
   font-family: inherit;
 }
 
-.user-name {
+.profile-link {
+  color: #3D4F61;
+  font-size: 16px;
+  font-weight: 600;
+  text-decoration: none;
+  padding: 10px 20px;
+  border-radius: 20px;
+  background: rgba(61, 79, 97, 0.1);
+  transition: background-color 0.3s ease;
+}
+
+.profile-link:hover {
+  background: rgba(61, 79, 97, 0.2);
+}
+
+.header.dark .profile-link {
+  color: #FFFFFF;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.header.dark .profile-link:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.user-email {
   color: #3D4F61;
   font-size: 16px;
   font-weight: 600;
 }
 
-.header.dark .user-name {
+.header.dark .user-email {
   color: #FFFFFF;
 }
 
-.logout-btn,
 .login-btn {
   background-color: #3D4F61;
   color: #FFFFFF;
@@ -133,18 +155,15 @@ const scrollToSection = (id: string) => {
   transition: background-color 0.3s ease;
 }
 
-.header.dark .logout-btn,
 .header.dark .login-btn {
   background-color: #FFFFFF;
   color: #3D4F61;
 }
 
-.logout-btn:hover,
 .login-btn:hover {
   background-color: #2C3E50;
 }
 
-.header.dark .logout-btn:hover,
 .header.dark .login-btn:hover {
   background-color: #f0f0f0;
 }
