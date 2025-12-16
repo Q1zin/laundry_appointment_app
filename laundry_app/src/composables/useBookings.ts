@@ -113,10 +113,11 @@ export function useBookings() {
   const updateBooking = (bookingId: string, bookingData: Omit<Booking, 'id' | 'createdAt'>) => {
     const index = bookings.value.findIndex(b => b.id === bookingId)
     if (index !== -1) {
+      const existing = bookings.value[index]
       const updatedBooking: Booking = {
         ...bookingData,
         id: bookingId,
-        createdAt: bookings.value[index].createdAt
+        createdAt: existing ? existing.createdAt : new Date()
       }
       bookings.value[index] = updatedBooking
       saveToStorage()
