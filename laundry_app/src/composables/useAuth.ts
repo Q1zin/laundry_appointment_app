@@ -19,7 +19,9 @@ const token = ref<string | null>(null)
 const initFromCookies = () => {
   const cookies = document.cookie.split(';').reduce((acc, cookie) => {
     const [key, value] = cookie.trim().split('=')
-    acc[key] = value
+    if (key) {
+      acc[key] = value || ''
+    }
     return acc
   }, {} as Record<string, string>)
 

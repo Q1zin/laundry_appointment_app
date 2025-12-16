@@ -3,16 +3,19 @@ import { ref, computed } from 'vue'
 export interface Booking {
   id: string
   machine: number
+  machineName?: string
   date: string
   dayName: string
   dayNumber: number
   time: string
   fullName: string
   room: string
+  userEmail?: string
   createdAt: Date
 }
 
 const BOOKINGS_KEY = 'user_bookings'
+const ALL_BOOKINGS_KEY = 'all_bookings'
 
 // Глобальное реактивное состояние
 const bookings = ref<Booking[]>([])
@@ -62,6 +65,17 @@ export function useBookings() {
     }
     bookings.value.push(newBooking)
     saveToStorage()
+    
+    // Также сохраняем в общий список для админа
+    try {
+      const allBookingsStr = localStorage.getItem(ALL_BOOKINGS_KEY)
+      const allBookings = allBookingsStr ? JSON.parse(allBookingsStr) : []
+      allBookings.push(newBooking)
+      localStorage.setItem(ALL_BOOKINGS_KEY, JSON.stringify(allBookings))
+    } catch {
+      // ignore
+    }
+    
     return newBooking
   }
 
@@ -70,6 +84,22 @@ export function useBookings() {
     if (index !== -1) {
       bookings.value.splice(index, 1)
       saveToStorage()
+      
+      // Также удаляем из общего списка
+      try {
+        const allBookingsStr = localStorage.getItem(ALL_BOOKINGS_KEY)
+        if (allBookingsStr) {
+          const allBookings = JSON.parse(allBookingsStr)
+          const allIndex = allBookings.findIndex((b: Booking) => b.id === bookingId)
+          if (allIndex !== -1) {
+            allBookings.splice(allIndex, 1)
+            localStorage.setItem(ALL_BOOKINGS_KEY, JSON.stringify(allBookings))
+          }
+        }
+      } catch {
+        // ignore
+      }
+      
       return true
     }
     return false

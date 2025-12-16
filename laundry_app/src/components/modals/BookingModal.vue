@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { ref, computed, toRef } from 'vue'
+import { ref, computed, toRef, watch } from 'vue'
 import WashingMachineOutlineIcon from '@/components/icons/WashingMachineOutlineIcon.vue'
 import UserIcon from '@/components/icons/UserIcon.vue'
 import KeyIcon from '@/components/icons/KeyIcon.vue'
 import { useAuth } from '@/composables/useAuth'
 import { useBookings } from '@/composables/useBookings'
+import { useMachines } from '@/composables/useMachines'
+import { useSchedule } from '@/composables/useSchedule'
 import { useBodyScrollLock } from '@/composables/useBodyScrollLock'
 
 const props = defineProps<{
@@ -19,32 +21,44 @@ const emit = defineEmits<{
 
 const { user } = useAuth()
 const { addBooking } = useBookings()
+const { machines, getActiveMachines } = useMachines()
+const { isSlotBlocked } = useSchedule()
 
 // Form state
-const selectedMachine = ref<number>(1)
-const selectedDateIndex = ref<number>(1)
-const selectedTimeIndex = ref<number>(2)
+const selectedMachine = ref<number | null>(null)
+const selectedDateIndex = ref<number>(0)
+const selectedTimeIndex = ref<number | null>(null)
 const fullName = ref('')
 const roomNumber = ref('')
 
 // Initialize from user data
-if (user.value) {
-  fullName.value = user.value.fullName || ''
-  roomNumber.value = user.value.room || ''
-}
+watch(() => props.isOpen, (isOpen) => {
+  if (isOpen && user.value) {
+    fullName.value = user.value.fullName || ''
+    roomNumber.value = user.value.room || ''
+    // Сброс выбора при открытии
+    selectedMachine.value = null
+    selectedTimeIndex.value = null
+  }
+}, { immediate: true })
+
+// Активные машинки
+const activeMachines = computed(() => getActiveMachines())
 
 // Generate dates for next 7 days
 const dates = computed(() => {
   const days = ['ВС', 'ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ']
-  const result: { dayName: string; dayNumber: number }[] = []
+  const result: { dayName: string; dayNumber: number; dateStr: string }[] = []
   const today = new Date()
   
   for (let i = 0; i < 7; i++) {
     const date = new Date(today)
     date.setDate(today.getDate() + i)
+    const dateStr = date.toISOString().split('T')[0] || ''
     result.push({
       dayName: days[date.getDay()] || 'ВС',
-      dayNumber: date.getDate()
+      dayNumber: date.getDate(),
+      dateStr
     })
   }
   return result
@@ -57,6 +71,26 @@ const timeSlots = [
   '21:00 - 23:00'
 ]
 
+// Проверка доступности слота
+const isTimeSlotAvailable = (timeIndex: number) => {
+  if (selectedMachine.value === null) return true
+  const selectedDate = dates.value[selectedDateIndex.value]
+  if (!selectedDate) return true
+  const time = timeSlots[timeIndex]
+  if (!time) return true
+  return !isSlotBlocked(selectedDate.dateStr, time, selectedMachine.value)
+}
+
+// Проверка доступности машинки
+const isMachineAvailable = (machineId: number) => {
+  if (selectedTimeIndex.value === null) return true
+  const selectedDate = dates.value[selectedDateIndex.value]
+  if (!selectedDate) return true
+  const time = timeSlots[selectedTimeIndex.value]
+  if (!time) return true
+  return !isSlotBlocked(selectedDate.dateStr, time, machineId)
+}
+
 const closeModal = () => {
   emit('close')
 }
@@ -67,21 +101,34 @@ const handleOverlayClick = (e: MouseEvent) => {
   }
 }
 
+const canSubmit = computed(() => {
+  return selectedMachine.value !== null && 
+         selectedTimeIndex.value !== null && 
+         fullName.value && 
+         roomNumber.value
+})
+
 const handleSubmit = () => {
+  if (!canSubmit.value) return
+  
   const selectedDate = dates.value[selectedDateIndex.value]
   if (!selectedDate) return
   
-  const time = timeSlots[selectedTimeIndex.value]
+  const time = timeSlots[selectedTimeIndex.value!]
   if (!time) return
+
+  const machine = activeMachines.value.find(m => m.id === selectedMachine.value)
   
   addBooking({
-    machine: selectedMachine.value,
-    date: `${selectedDate.dayNumber}`,
+    machine: selectedMachine.value!,
+    machineName: machine?.name,
+    date: selectedDate.dateStr,
     dayName: selectedDate.dayName,
     dayNumber: selectedDate.dayNumber,
     time: time,
     fullName: fullName.value,
-    room: roomNumber.value
+    room: roomNumber.value,
+    userEmail: user.value?.email
   })
   
   closeModal()
@@ -128,7 +175,8 @@ const handleSubmit = () => {
                 v-for="(time, index) in timeSlots"
                 :key="index"
                 class="time-btn"
-                :class="{ active: selectedTimeIndex === index }"
+                :class="{ active: selectedTimeIndex === index, disabled: !isTimeSlotAvailable(index) }"
+                :disabled="!isTimeSlotAvailable(index)"
                 @click="selectedTimeIndex = index"
               >
                 {{ time }}
@@ -141,14 +189,15 @@ const handleSubmit = () => {
             <h3 class="section-title">ВЫБЕРИТЕ МАШИНКУ</h3>
             <div class="machines-grid">
               <button 
-                v-for="n in 2" 
-                :key="n"
+                v-for="machine in activeMachines" 
+                :key="machine.id"
                 class="machine-card"
-                :class="{ active: selectedMachine === n }"
-                @click="selectedMachine = n"
+                :class="{ active: selectedMachine === machine.id, disabled: !isMachineAvailable(machine.id) }"
+                :disabled="!isMachineAvailable(machine.id)"
+                @click="selectedMachine = machine.id"
               >
                 <WashingMachineOutlineIcon :size="50" />
-                <span class="machine-name">МАШИНКА {{ n }}</span>
+                <span class="machine-name">{{ machine.name }}</span>
               </button>
             </div>
           </div>
@@ -178,7 +227,14 @@ const handleSubmit = () => {
           </div>
 
           <!-- Submit Button -->
-          <button class="submit-btn" @click="handleSubmit">ЗАПИСАТЬСЯ</button>
+          <button 
+            class="submit-btn" 
+            :class="{ disabled: !canSubmit }"
+            :disabled="!canSubmit"
+            @click="handleSubmit"
+          >
+            ЗАПИСАТЬСЯ
+          </button>
         </div>
       </div>
     </Transition>
@@ -289,6 +345,16 @@ const handleSubmit = () => {
   border: 3px solid #6B8DB8;
 }
 
+.machine-card.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  background: #F0F0F0;
+}
+
+.machine-card.disabled:hover {
+  border-color: #E8EEF2;
+}
+
 .machine-name {
   font-size: 14px;
   font-weight: 600;
@@ -374,6 +440,17 @@ const handleSubmit = () => {
   color: #FFFFFF;
 }
 
+.time-btn.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  background: #F0F0F0;
+}
+
+.time-btn.disabled:hover {
+  border-color: #E8EEF2;
+  background: #F0F0F0;
+}
+
 /* Input Fields */
 .inputs-section {
   display: flex;
@@ -443,6 +520,18 @@ const handleSubmit = () => {
 
 .submit-btn:active {
   transform: translateY(0);
+}
+
+.submit-btn.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.submit-btn.disabled:hover {
+  transform: none;
+  background: #6B8DB8;
+  box-shadow: none;
 }
 
 /* Transitions */
