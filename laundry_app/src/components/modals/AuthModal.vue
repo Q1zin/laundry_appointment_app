@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, toRef } from 'vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import WashingMachineIcon from '@/components/icons/WashingMachineIcon.vue'
@@ -11,10 +11,13 @@ import HomeIcon from '@/components/icons/HomeIcon.vue'
 import GroupIcon from '@/components/icons/GroupIcon.vue'
 import DocumentIcon from '@/components/icons/DocumentIcon.vue'
 import { useAuth } from '@/composables/useAuth'
+import { useBodyScrollLock } from '@/composables/useBodyScrollLock'
 
 const props = defineProps<{
   isOpen: boolean
 }>()
+
+useBodyScrollLock(toRef(props, 'isOpen'))
 
 const emit = defineEmits<{
   close: []

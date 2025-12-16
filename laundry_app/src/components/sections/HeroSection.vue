@@ -1,22 +1,9 @@
 <script setup lang="ts">
 import WashingMachine3DIcon from '@/components/icons/WashingMachine3DIcon.vue'
 
-const props = defineProps<{
-  isLoggedIn?: boolean
-}>()
-
 const emit = defineEmits<{
-  authRequired: []
+  bookingClick: []
 }>()
-
-const handleBookingClick = () => {
-  if (!props.isLoggedIn) {
-    emit('authRequired')
-    return
-  }
-  const element = document.getElementById('booking')
-  element?.scrollIntoView({ behavior: 'smooth' })
-}
 </script>
 
 <template>
@@ -28,7 +15,7 @@ const handleBookingClick = () => {
         <p class="hero-description">
           ТЕПЕРЬ ВЫ НЕ ЗАБУДЕТЕ О СТИРКЕ: МЫ НАПОМНИМ ЗАРАНЕЕ, ПОДСКАЖЕМ, КОГДА ОТКРОЕТСЯ ЗАПИСЬ, И НИКТО НЕ ЗАЙМЕТ ВАШЕ ВРЕМЯ.
         </p>
-        <button class="hero-button" @click="handleBookingClick">ЗАПИСАТЬСЯ</button>
+        <button class="hero-button" @click="emit('bookingClick')">ЗАПИСАТЬСЯ</button>
       </div>
       <div class="hero-image">
         <WashingMachine3DIcon :size="380" />

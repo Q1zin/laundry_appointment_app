@@ -3,12 +3,8 @@ import SkullIcon from '@/components/icons/SkullIcon.vue'
 import BellIcon from '@/components/icons/BellIcon.vue'
 import ClockBackIcon from '@/components/icons/ClockBackIcon.vue'
 
-const props = defineProps<{
-  isLoggedIn?: boolean
-}>()
-
 const emit = defineEmits<{
-  authRequired: []
+  bookingClick: []
 }>()
 
 const benefits = [
@@ -25,14 +21,6 @@ const benefits = [
     text: 'НЕ ПРОПУСТИТЕ ОТКРЫТИЕ ЗАПИСИ. В МОМЕНТ СТАРТА ПРИДЁТ УВЕДОМЛЕНИЕ НА EMAIL.'
   }
 ]
-
-const handleBookingClick = () => {
-  if (!props.isLoggedIn) {
-    emit('authRequired')
-    return
-  }
-  // TODO: перейти к форме записи
-}
 </script>
 
 <template>
@@ -56,7 +44,7 @@ const handleBookingClick = () => {
         </div>
       </div>
 
-      <button class="cta-button" @click="handleBookingClick">ЗАПИСАТЬСЯ</button>
+      <button class="cta-button" @click="emit('bookingClick')">ЗАПИСАТЬСЯ</button>
     </div>
   </section>
 </template>

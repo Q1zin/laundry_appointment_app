@@ -6,11 +6,13 @@ import RulesSection from '@/components/sections/RulesSection.vue'
 import HowItWorksSection from '@/components/sections/HowItWorksSection.vue'
 import BenefitsSection from '@/components/sections/BenefitsSection.vue'
 import AuthModal from '@/components/modals/AuthModal.vue'
+import BookingModal from '@/components/modals/BookingModal.vue'
 import { useAuth } from '@/composables/useAuth'
 
 const { isLoggedIn, user, logout } = useAuth()
 
 const isAuthModalOpen = ref(false)
+const isBookingModalOpen = ref(false)
 
 const userName = computed(() => user.value?.fullName || user.value?.username || '')
 
@@ -20,6 +22,22 @@ const openAuthModal = () => {
 
 const closeAuthModal = () => {
   isAuthModalOpen.value = false
+}
+
+const openBookingModal = () => {
+  isBookingModalOpen.value = true
+}
+
+const closeBookingModal = () => {
+  isBookingModalOpen.value = false
+}
+
+const handleBookingClick = () => {
+  if (isLoggedIn.value) {
+    openBookingModal()
+  } else {
+    openAuthModal()
+  }
 }
 
 const handleLogout = () => {
@@ -34,23 +52,23 @@ const handleLogout = () => {
       :user-name="userName"
       @login-click="openAuthModal"
       @logout-click="handleLogout"
+      @booking-click="handleBookingClick"
     />
     <main>
-      <HeroSection 
-        :is-logged-in="isLoggedIn" 
-        @auth-required="openAuthModal" 
-      />
+      <HeroSection @booking-click="handleBookingClick" />
       <RulesSection />
       <HowItWorksSection />
-      <BenefitsSection 
-        :is-logged-in="isLoggedIn" 
-        @auth-required="openAuthModal" 
-      />
+      <BenefitsSection @booking-click="handleBookingClick" />
     </main>
 
     <AuthModal 
       :is-open="isAuthModalOpen" 
       @close="closeAuthModal" 
+    />
+
+    <BookingModal 
+      :is-open="isBookingModalOpen" 
+      @close="closeBookingModal" 
     />
   </div>
 </template>

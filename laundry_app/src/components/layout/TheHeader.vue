@@ -8,6 +8,7 @@ defineProps<{
 const emit = defineEmits<{
   loginClick: []
   logoutClick: []
+  bookingClick: []
 }>()
 </script>
 
@@ -17,7 +18,7 @@ const emit = defineEmits<{
       <div class="logo">СТИРКА-</div>
       <nav class="nav">
         <a href="#rules" class="nav-link">ПРАВИЛА</a>
-        <a href="#booking" class="nav-link">ЗАПИСЬ</a>
+        <button class="nav-link nav-btn" @click="emit('bookingClick')">ЗАПИСЬ</button>
         <template v-if="isLoggedIn">
           <span class="user-name">{{ userName }}</span>
           <button 
@@ -93,6 +94,13 @@ const emit = defineEmits<{
 
 .nav-link:hover {
   opacity: 0.7;
+}
+
+.nav-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
 }
 
 .user-name {
