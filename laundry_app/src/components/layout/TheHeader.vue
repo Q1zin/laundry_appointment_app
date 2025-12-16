@@ -10,6 +10,13 @@ const emit = defineEmits<{
   logoutClick: []
   bookingClick: []
 }>()
+
+const scrollToSection = (id: string) => {
+  const element = document.getElementById(id)
+  if (element) {
+    element.scrollIntoView({ behavior: 'smooth' })
+  }
+}
 </script>
 
 <template>
@@ -17,7 +24,7 @@ const emit = defineEmits<{
     <div class="header-content">
       <div class="logo">СТИРКА-</div>
       <nav class="nav">
-        <a href="#rules" class="nav-link">ПРАВИЛА</a>
+        <button class="nav-link nav-btn" @click="scrollToSection('rules')">ПРАВИЛА</button>
         <button class="nav-link nav-btn" @click="emit('bookingClick')">ЗАПИСЬ</button>
         <template v-if="isLoggedIn">
           <span class="user-name">{{ userName }}</span>
