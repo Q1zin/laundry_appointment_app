@@ -1,6 +1,12 @@
 <script setup lang="ts">
 defineProps<{
   variant?: 'light' | 'dark'
+  isLoggedIn?: boolean
+}>()
+
+const emit = defineEmits<{
+  loginClick: []
+  logoutClick: []
 }>()
 </script>
 
@@ -11,7 +17,20 @@ defineProps<{
       <nav class="nav">
         <a href="#rules" class="nav-link">ПРАВИЛА</a>
         <a href="#booking" class="nav-link">ЗАПИСЬ</a>
-        <button class="logout-btn">ВЫХОД</button>
+        <button 
+          v-if="isLoggedIn" 
+          class="logout-btn" 
+          @click="emit('logoutClick')"
+        >
+          ВЫХОД
+        </button>
+        <button 
+          v-else 
+          class="login-btn" 
+          @click="emit('loginClick')"
+        >
+          ВОЙТИ
+        </button>
       </nav>
     </div>
   </header>
@@ -73,7 +92,8 @@ defineProps<{
   opacity: 0.7;
 }
 
-.logout-btn {
+.logout-btn,
+.login-btn {
   background-color: #3D4F61;
   color: #FFFFFF;
   border: none;
@@ -85,16 +105,19 @@ defineProps<{
   transition: background-color 0.3s ease;
 }
 
-.header.dark .logout-btn {
+.header.dark .logout-btn,
+.header.dark .login-btn {
   background-color: #FFFFFF;
   color: #3D4F61;
 }
 
-.logout-btn:hover {
+.logout-btn:hover,
+.login-btn:hover {
   background-color: #2C3E50;
 }
 
-.header.dark .logout-btn:hover {
+.header.dark .logout-btn:hover,
+.header.dark .login-btn:hover {
   background-color: #f0f0f0;
 }
 
@@ -115,7 +138,8 @@ defineProps<{
     font-size: 14px;
   }
 
-  .logout-btn {
+  .logout-btn,
+  .login-btn {
     padding: 10px 25px;
     font-size: 14px;
   }

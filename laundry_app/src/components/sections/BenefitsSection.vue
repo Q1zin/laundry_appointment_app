@@ -3,6 +3,14 @@ import SkullIcon from '@/components/icons/SkullIcon.vue'
 import BellIcon from '@/components/icons/BellIcon.vue'
 import ClockBackIcon from '@/components/icons/ClockBackIcon.vue'
 
+const props = defineProps<{
+  isLoggedIn?: boolean
+}>()
+
+const emit = defineEmits<{
+  authRequired: []
+}>()
+
 const benefits = [
   {
     icon: SkullIcon,
@@ -18,9 +26,12 @@ const benefits = [
   }
 ]
 
-const scrollToBooking = () => {
-  const element = document.getElementById('booking')
-  element?.scrollIntoView({ behavior: 'smooth' })
+const handleBookingClick = () => {
+  if (!props.isLoggedIn) {
+    emit('authRequired')
+    return
+  }
+  // TODO: перейти к форме записи
 }
 </script>
 
@@ -45,7 +56,7 @@ const scrollToBooking = () => {
         </div>
       </div>
 
-      <button class="cta-button" @click="scrollToBooking">ЗАПИСАТЬСЯ</button>
+      <button class="cta-button" @click="handleBookingClick">ЗАПИСАТЬСЯ</button>
     </div>
   </section>
 </template>
