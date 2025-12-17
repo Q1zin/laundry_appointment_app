@@ -4,6 +4,9 @@ interface User {
   id: string
   name: string
   email: string
+  fullName: string
+  room: string
+  contract: string
   role: string
   blocked: boolean
 }
@@ -95,9 +98,12 @@ export function useAuth() {
           const fullUserData = await userResponse.json()
           
           const userData: User = {
-            id: fullUserData.id, // реальный ID из базы (например "user-1")
+            id: fullUserData.id,
             name: fullUserData.name,
-            email: `${fullUserData.name}@laundry.local`,
+            email: fullUserData.email || '',
+            fullName: fullUserData.fullName || '',
+            room: fullUserData.room || '',
+            contract: fullUserData.contract || '',
             role: fullUserData.role,
             blocked: fullUserData.isBlocked || false
           }
@@ -111,7 +117,10 @@ export function useAuth() {
         const userData: User = {
           id: name,
           name: name,
-          email: `${name}@laundry.local`,
+          email: '',
+          fullName: '',
+          room: '',
+          contract: '',
           role: data.role,
           blocked: false
         }
@@ -169,6 +178,9 @@ export function useAuth() {
             id: fullUserData.id,
             name: fullUserData.name,
             email: fullUserData.email || userData.email,
+            fullName: fullUserData.fullName || userData.fullName,
+            room: fullUserData.room || userData.room,
+            contract: fullUserData.contract || userData.contract,
             role: fullUserData.role,
             blocked: fullUserData.isBlocked || false
           }

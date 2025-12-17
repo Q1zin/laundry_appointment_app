@@ -146,16 +146,28 @@ const closeBookingModal = async () => {
           <div class="profile-card">
             <div class="profile-info">
               <div class="info-row">
+                <span class="info-label">ФИО:</span>
+                <span class="info-value">{{ user?.fullName || 'Не указано' }}</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">Email:</span>
+                <span class="info-value">{{ user?.email || 'Не указан' }}</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">Комната:</span>
+                <span class="info-value">{{ user?.room || 'Не указана' }}</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">Договор найма:</span>
+                <span class="info-value">{{ user?.contract || 'Не указан' }}</span>
+              </div>
+              <div class="info-row">
                 <span class="info-label">Логин:</span>
                 <span class="info-value">{{ user?.name || 'Не указан' }}</span>
               </div>
               <div class="info-row">
                 <span class="info-label">Роль:</span>
-                <span class="info-value">{{ user?.role === 'ADMIN' ? 'Администратор' : 'Пользователь' }}</span>
-              </div>
-              <div class="info-row">
-                <span class="info-label">ID:</span>
-                <span class="info-value">{{ user?.id || 'Не указан' }}</span>
+                <span class="info-value">{{ user?.role === 'admin' ? 'Администратор' : 'Пользователь' }}</span>
               </div>
             </div>
           </div>

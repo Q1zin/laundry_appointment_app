@@ -39,9 +39,6 @@ const handleLogout = () => {
           <RouterLink to="/profile" class="profile-link">
             {{ user?.name || 'Профиль' }}
           </RouterLink>
-          <button class="logout-btn" @click="handleLogout" title="Выход">
-            Выйти
-          </button>
         </template>
         <button 
           v-else 
