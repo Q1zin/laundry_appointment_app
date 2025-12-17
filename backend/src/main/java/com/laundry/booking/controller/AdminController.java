@@ -1,5 +1,6 @@
 package com.laundry.booking.controller;
 
+import com.laundry.booking.dto.AdminBookingDto;
 import com.laundry.booking.dto.BookingResult;
 import com.laundry.booking.dto.DateRequest;
 import com.laundry.booking.dto.MachineRequest;
@@ -20,6 +21,7 @@ import java.util.List;
  * - POST /api/admin/bookings/open
  * - POST /api/admin/bookings/close
  * - DELETE /api/admin/bookings/:bookingId
+ * - GET /api/admin/bookings
  * - GET /api/admin/users
  * - POST /api/admin/users/block
  * - POST /api/admin/users/unblock
@@ -84,6 +86,16 @@ public class AdminController {
     public ResponseEntity<BookingResult> deleteBooking(@PathVariable String bookingId) {
         BookingResult result = adminService.deleteBooking(bookingId);
         return ResponseEntity.ok(result);
+    }
+
+    /**
+     * GET /api/admin/bookings
+     * Response: List<AdminBookingDto>
+     */
+    @GetMapping("/bookings")
+    public ResponseEntity<List<AdminBookingDto>> getAllBookings() {
+        List<AdminBookingDto> bookings = adminService.getAllBookingsWithDetails();
+        return ResponseEntity.ok(bookings);
     }
 
     /**

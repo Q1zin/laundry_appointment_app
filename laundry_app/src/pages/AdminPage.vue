@@ -24,6 +24,21 @@ interface AdminUser {
   createdAt: string
 }
 
+interface AdminBooking {
+  id: string
+  userId: string
+  userName: string
+  userFullName: string
+  userRoom: string
+  machineId: string
+  machineName: string
+  slotId: string
+  slotStartTime: string
+  slotEndTime: string
+  state: string
+  createdAt: string
+}
+
 const router = useRouter()
 const { isLoggedIn, isAdmin, user } = useAuth()
 
@@ -35,7 +50,7 @@ onMounted(() => {
 })
 
 // Состояние
-const activeTab = ref<'machines' | 'users'>('machines')
+const activeTab = ref<'machines' | 'users' | 'bookings'>('machines')
 const isLoading = ref(false)
 const actionError = ref<string | null>(null)
 const actionSuccess = ref<string | null>(null)
@@ -48,6 +63,9 @@ const selectedMachineId = ref<string | null>(null)
 
 // Пользователи
 const users = ref<AdminUser[]>([])
+
+// Все записи
+const allBookings = ref<AdminBooking[]>([])
 
 // Машинки (админ)
 const { blockMachine, unblockMachine } = useMachines()
@@ -64,6 +82,7 @@ onMounted(async () => {
   
   await loadSchedule()
   await loadUsers()
+  await loadAllBookings()
 })
 
 // Загрузка расписания
@@ -93,6 +112,18 @@ const loadUsers = async () => {
     }
   } catch (err) {
     console.error('Failed to load users:', err)
+  }
+}
+
+// Загрузка всех записей
+const loadAllBookings = async () => {
+  try {
+    const response = await fetch('/api/admin/bookings')
+    if (response.ok) {
+      allBookings.value = await response.json()
+    }
+  } catch (err) {
+    console.error('Failed to load bookings:', err)
   }
 }
 
@@ -136,7 +167,7 @@ const handleUnblockMachine = async (machineId: string) => {
 }
 
 const handleDeleteBooking = async (bookingId: string) => {
-  if (!confirm('Удалить эту запись?')) return
+  if (!confirm('Отменить эту запись?')) return
   
   isLoading.value = true
   actionError.value = null
@@ -147,10 +178,35 @@ const handleDeleteBooking = async (bookingId: string) => {
   isLoading.value = false
   
   if (result.success) {
-    actionSuccess.value = 'Запись удалена'
+    actionSuccess.value = 'Запись отменена'
     await loadSchedule()
+    await loadAllBookings()
   } else {
-    actionError.value = result.message || 'Ошибка удаления'
+    actionError.value = result.message || 'Ошибка отмены'
+  }
+}
+
+// Форматирование времени
+const formatTime = (isoString: string) => {
+  if (!isoString) return ''
+  const date = new Date(isoString)
+  return `${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`
+}
+
+// Форматирование даты
+const formatDate = (isoString: string) => {
+  if (!isoString) return ''
+  const date = new Date(isoString)
+  return date.toLocaleDateString('ru-RU')
+}
+
+// Получение статуса записи
+const getBookingStatus = (state: string) => {
+  switch (state) {
+    case 'active': return 'Активна'
+    case 'canceled': return 'Отменена'
+    case 'deleted': return 'Удалена'
+    default: return state
   }
 }
 
@@ -254,6 +310,14 @@ const handleUnblockUser = async (userId: string) => {
             <UserIcon :size="20" :color="activeTab === 'users' ? '#9CA3AF' : '#3D4F61'" />
             Пользователи
           </button>
+          <button 
+            class="tab-btn" 
+            :class="{ active: activeTab === 'bookings' }"
+            @click="activeTab = 'bookings'"
+          >
+            <CalendarIcon :size="20" :color="activeTab === 'bookings' ? '#9CA3AF' : '#3D4F61'" />
+            Записи
+          </button>
         </div>
 
         <!-- Machines Management -->
@@ -349,6 +413,60 @@ const handleUnblockUser = async (userId: string) => {
                   @click="handleUnblockUser(u.id)"
                 >
                   Разблокировать
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Bookings Management -->
+        <section v-if="!isLoading && activeTab === 'bookings'" class="section">
+          <h2 class="section-title">ВСЕ ЗАПИСИ</h2>
+          
+          <div v-if="allBookings.length === 0" class="no-data">
+            Нет записей
+          </div>
+
+          <div v-else class="bookings-list">
+            <div 
+              v-for="booking in allBookings" 
+              :key="booking.id" 
+              class="booking-card"
+              :class="{ 'booking-inactive': booking.state !== 'active' }"
+            >
+              <div class="booking-icon">
+                <WashingMachineOutlineIcon :size="40" color="#3D4F61" />
+              </div>
+              <div class="booking-info">
+                <h3 class="booking-machine">{{ booking.machineName || `Машинка #${booking.machineId}` }}</h3>
+                <div class="booking-details">
+                  <span class="booking-detail">
+                    <CalendarIcon :size="14" color="#6B7280" />
+                    {{ formatDate(booking.slotStartTime) }} {{ formatTime(booking.slotStartTime) }} - {{ formatTime(booking.slotEndTime) }}
+                  </span>
+                </div>
+                <div class="booking-user">
+                  <UserIcon :size="14" color="#6B7280" />
+                  <span>{{ booking.userFullName || booking.userName }}</span>
+                  <span v-if="booking.userRoom" class="booking-room">Комната: {{ booking.userRoom }}</span>
+                </div>
+                <div class="booking-meta">
+                  <span 
+                    class="booking-status"
+                    :class="booking.state"
+                  >
+                    {{ getBookingStatus(booking.state) }}
+                  </span>
+                  <span class="booking-created">Создано: {{ new Date(booking.createdAt).toLocaleString('ru-RU') }}</span>
+                </div>
+              </div>
+              <div class="booking-actions" v-if="booking.state === 'active'">
+                <button 
+                  class="action-btn block-btn"
+                  @click="handleDeleteBooking(booking.id)"
+                >
+                  <TrashIcon :size="16" color="white" />
+                  Отменить
                 </button>
               </div>
             </div>
@@ -655,5 +773,112 @@ const handleUnblockUser = async (userId: string) => {
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+/* Bookings */
+.bookings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.booking-card {
+  background: #FFFFFF;
+  border-radius: 16px;
+  padding: 20px 25px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.06);
+}
+
+.booking-card.booking-inactive {
+  opacity: 0.6;
+}
+
+.booking-icon {
+  flex-shrink: 0;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: #E8EEF2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.booking-info {
+  flex: 1;
+}
+
+.booking-machine {
+  font-size: 18px;
+  font-weight: 600;
+  color: #3D4F61;
+  margin: 0 0 8px 0;
+}
+
+.booking-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+  margin-bottom: 6px;
+}
+
+.booking-detail {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 14px;
+  color: #6B7280;
+}
+
+.booking-user {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #6B7280;
+  margin-bottom: 6px;
+}
+
+.booking-room {
+  color: #9CA3AF;
+  margin-left: 10px;
+}
+
+.booking-meta {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.booking-status {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.booking-status.active {
+  background: rgba(34, 197, 94, 0.1);
+  color: #22C55E;
+}
+
+.booking-status.canceled,
+.booking-status.deleted {
+  background: rgba(239, 68, 68, 0.1);
+  color: #EF4444;
+}
+
+.booking-created {
+  font-size: 12px;
+  color: #9CA3AF;
+}
+
+.booking-actions {
+  display: flex;
+  gap: 10px;
 }
 </style>

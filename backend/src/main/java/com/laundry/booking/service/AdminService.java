@@ -1,5 +1,6 @@
 package com.laundry.booking.service;
 
+import com.laundry.booking.dto.AdminBookingDto;
 import com.laundry.booking.dto.BookingResult;
 import com.laundry.booking.entity.Booking;
 import com.laundry.booking.entity.Machine;
@@ -16,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -230,5 +232,49 @@ public class AdminService {
         userRepository.save(user);
 
         return new BookingResult(true, "User unblocked successfully");
+    }
+
+    /**
+     * Admin Controller - getAllBookingsWithDetails method
+     * Возвращает все бронирования с деталями
+     */
+    public List<AdminBookingDto> getAllBookingsWithDetails() {
+        List<Booking> bookings = bookingRepository.findAll();
+        List<AdminBookingDto> result = new ArrayList<>();
+
+        for (Booking booking : bookings) {
+            AdminBookingDto dto = new AdminBookingDto();
+            dto.setId(booking.getId());
+            dto.setUserId(booking.getUserId());
+            dto.setMachineId(booking.getMachineId());
+            dto.setSlotId(booking.getSlotId());
+            dto.setState(booking.getState());
+            dto.setCreatedAt(booking.getCreatedAt());
+
+            // Получаем данные пользователя
+            User user = userRepository.findById(booking.getUserId()).orElse(null);
+            if (user != null) {
+                dto.setUserName(user.getName());
+                dto.setUserFullName(user.getFullName());
+                dto.setUserRoom(user.getRoom());
+            }
+
+            // Получаем данные машинки
+            Machine machine = machineRepository.findById(booking.getMachineId()).orElse(null);
+            if (machine != null) {
+                dto.setMachineName(machine.getName());
+            }
+
+            // Получаем данные слота
+            Timeslot slot = timeslotRepository.findById(booking.getSlotId()).orElse(null);
+            if (slot != null) {
+                dto.setSlotStartTime(slot.getStartTime());
+                dto.setSlotEndTime(slot.getEndTime());
+            }
+
+            result.add(dto);
+        }
+
+        return result;
     }
 }
