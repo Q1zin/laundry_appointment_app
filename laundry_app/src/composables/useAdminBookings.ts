@@ -1,74 +1,52 @@
-import { ref, computed } from 'vue'
-import type { Booking } from './useBookings'
+import { ref } from 'vue'
 
-const ALL_BOOKINGS_KEY = 'all_bookings'
+const API_BASE = '/api'
 
-// Глобальное состояние всех записей (для админа)
+interface Booking {
+  id: string
+  userId: string
+  machineId: string
+  slotId: string
+  state: string
+  createdAt: string
+}
+
 const allBookings = ref<Booking[]>([])
-let initialized = false
-
-// Инициализация из localStorage
-const initFromStorage = () => {
-  if (initialized) return
-  
-  try {
-    const stored = localStorage.getItem(ALL_BOOKINGS_KEY)
-    if (stored) {
-      allBookings.value = JSON.parse(stored)
-    }
-    initialized = true
-  } catch {
-    // ignore
-  }
-}
-
-// Сохранение в localStorage
-const saveToStorage = () => {
-  localStorage.setItem(ALL_BOOKINGS_KEY, JSON.stringify(allBookings.value))
-}
+const loading = ref(false)
+const error = ref<string | null>(null)
 
 export function useAdminBookings() {
-  initFromStorage()
+  // Удалить бронирование (Админ)
+  const deleteBooking = async (bookingId: string) => {
+    loading.value = true
+    error.value = null
 
-  // Добавить запись (вызывается из useBookings)
-  const addBookingToAll = (booking: Booking) => {
-    allBookings.value.push(booking)
-    saveToStorage()
-  }
+    try {
+      const response = await fetch(`${API_BASE}/admin/bookings/${bookingId}`, {
+        method: 'DELETE'
+      })
 
-  // Удалить запись (админ отменяет)
-  const cancelBookingAdmin = (bookingId: string) => {
-    const index = allBookings.value.findIndex(b => b.id === bookingId)
-    if (index !== -1) {
-      allBookings.value.splice(index, 1)
-      saveToStorage()
-      return true
+      const data = await response.json()
+
+      if (!response.ok || !data.result) {
+        error.value = data.message || 'Failed to delete booking'
+        return { success: false, message: error.value }
+      }
+
+      return { success: true, message: data.message }
+    } catch (err) {
+      error.value = 'Network error. Please try again.'
+      console.error('Delete booking error:', err)
+      return { success: false, message: error.value }
+    } finally {
+      loading.value = false
     }
-    return false
-  }
-
-  // Получить все записи
-  const getAllBookings = () => {
-    return allBookings.value
-  }
-
-  // Получить записи по дате
-  const getBookingsByDate = (date: string) => {
-    return allBookings.value.filter(b => b.date === date)
-  }
-
-  // Очистить все записи
-  const clearAllBookings = () => {
-    allBookings.value = []
-    saveToStorage()
   }
 
   return {
     allBookings,
-    addBookingToAll,
-    cancelBookingAdmin,
-    getAllBookings,
-    getBookingsByDate,
-    clearAllBookings
+    loading,
+    error,
+    deleteBooking
   }
 }

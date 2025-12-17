@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { ref, toRef } from 'vue'
+import { ref, toRef, watch } from 'vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import WashingMachineIcon from '@/components/icons/WashingMachineIcon.vue'
 import LockIcon from '@/components/icons/LockIcon.vue'
-import EmailIcon from '@/components/icons/EmailIcon.vue'
+import UserIcon from '@/components/icons/UserIcon.vue'
 import IdCardIcon from '@/components/icons/IdCardIcon.vue'
 import HomeIcon from '@/components/icons/HomeIcon.vue'
 import GroupIcon from '@/components/icons/GroupIcon.vue'
@@ -29,8 +29,10 @@ type AuthMode = 'login' | 'register'
 const mode = ref<AuthMode>('login')
 
 // Login form
-const loginEmail = ref('')
+const loginUsername = ref('')
 const loginPassword = ref('')
+const loginError = ref('')
+const isLoginLoading = ref(false)
 
 // Register form
 const regEmail = ref('')
@@ -40,6 +42,19 @@ const regRoom = ref('')
 const regContract = ref('')
 const regPassword = ref('')
 const regPasswordConfirm = ref('')
+const regError = ref('')
+const isRegLoading = ref(false)
+
+// Очищаем ошибки при смене режима
+watch(mode, () => {
+  loginError.value = ''
+  regError.value = ''
+})
+
+// Очищаем ошибку входа при изменении полей
+watch([loginUsername, loginPassword], () => {
+  loginError.value = ''
+})
 
 const switchMode = (newMode: AuthMode) => {
   mode.value = newMode
@@ -55,41 +70,83 @@ const handleOverlayClick = (e: MouseEvent) => {
   }
 }
 
-const handleLogin = () => {
-  if (!loginEmail.value || !loginPassword.value) return
+const handleLogin = async () => {
+  if (!loginUsername.value || !loginPassword.value) {
+    loginError.value = 'Заполните все поля'
+    return
+  }
   
-  login(loginEmail.value, loginPassword.value)
-  loginEmail.value = ''
-  loginPassword.value = ''
-  emit('success')
-  closeModal()
+  isLoginLoading.value = true
+  loginError.value = ''
+  
+  try {
+    const result = await login(loginUsername.value, loginPassword.value)
+    
+    if (result.success) {
+      // Успешный вход
+      loginUsername.value = ''
+      loginPassword.value = ''
+      emit('success')
+      closeModal()
+    } else {
+      // Ошибка аутентификации
+      loginError.value = result.message || 'Неверный логин или пароль'
+    }
+  } catch (error) {
+    loginError.value = 'Ошибка соединения с сервером'
+  } finally {
+    isLoginLoading.value = false
+  }
 }
 
-const handleRegister = () => {
-  if (!regEmail.value || !regFullName.value || 
-      !regGroup.value || !regRoom.value || !regContract.value || 
-      !regPassword.value || regPassword.value !== regPasswordConfirm.value) return
+const handleRegister = async () => {
+  // Валидация
+  if (!regEmail.value || !regFullName.value) {
+    regError.value = 'Заполните все обязательные поля'
+    return
+  }
   
-  register({
-    email: regEmail.value,
-    fullName: regFullName.value,
-    group: regGroup.value,
-    room: regRoom.value,
-    contract: regContract.value,
-    password: regPassword.value
-  })
+  if (regPassword.value !== regPasswordConfirm.value) {
+    regError.value = 'Пароли не совпадают'
+    return
+  }
   
-  // Reset form
-  regEmail.value = ''
-  regFullName.value = ''
-  regGroup.value = ''
-  regRoom.value = ''
-  regContract.value = ''
-  regPassword.value = ''
-  regPasswordConfirm.value = ''
+  if (regPassword.value.length < 6) {
+    regError.value = 'Пароль должен быть не менее 6 символов'
+    return
+  }
   
-  emit('success')
-  closeModal()
+  isRegLoading.value = true
+  regError.value = ''
+  
+  try {
+    const result = await register({
+      email: regEmail.value,
+      name: regFullName.value,
+      password: regPassword.value
+    })
+    
+    if (result.success) {
+      // Успешная регистрация
+      regEmail.value = ''
+      regFullName.value = ''
+      regGroup.value = ''
+      regRoom.value = ''
+      regContract.value = ''
+      regPassword.value = ''
+      regPasswordConfirm.value = ''
+      
+      // Показываем сообщение и переключаемся на вход
+      alert('Регистрация успешна! Теперь войдите в систему.')
+      mode.value = 'login'
+    } else {
+      regError.value = result.message || 'Ошибка регистрации'
+    }
+  } catch (error) {
+    regError.value = 'Ошибка соединения с сервером'
+  } finally {
+    isRegLoading.value = false
+  }
 }
 </script>
 
@@ -131,53 +188,103 @@ const handleRegister = () => {
           </div>
 
           <!-- Login Form -->
-          <form v-if="mode === 'login'" class="auth-form" @submit.prevent>
+          <form v-if="mode === 'login'" class="auth-form" @submit.prevent="handleLogin">
             <div class="form-fields">
-              <BaseInput v-model="loginEmail" type="email" placeholder="Email">
-                <template #icon><EmailIcon /></template>
+              <BaseInput 
+                v-model="loginUsername" 
+                type="text" 
+                placeholder="Логин (например: admin)"
+                :disabled="isLoginLoading"
+              >
+                <template #icon><UserIcon /></template>
               </BaseInput>
 
-              <BaseInput v-model="loginPassword" type="password" placeholder="Пароль">
+              <BaseInput 
+                v-model="loginPassword" 
+                type="password" 
+                placeholder="Пароль"
+                :disabled="isLoginLoading"
+              >
                 <template #icon><LockIcon /></template>
               </BaseInput>
+
+              <!-- Ошибка входа -->
+              <div v-if="loginError" class="error-message">
+                {{ loginError }}
+              </div>
             </div>
 
-            <BaseButton class="submit-btn" @click="handleLogin">ВОЙТИ</BaseButton>
+            <BaseButton 
+              class="submit-btn" 
+              :disabled="isLoginLoading"
+              @click="handleLogin"
+            >
+              {{ isLoginLoading ? 'ВХОД...' : 'ВОЙТИ' }}
+            </BaseButton>
+
+            <!-- Подсказка для тестирования -->
+            <p class="hint-text">
+              Тестовый логин: <strong>admin</strong> или <strong>john_doe</strong><br>
+              Пароль: <strong>password123</strong>
+            </p>
           </form>
 
           <!-- Register Form -->
-          <form v-else class="auth-form" @submit.prevent>
+          <form v-else class="auth-form" @submit.prevent="handleRegister">
             <div class="form-fields">
-              <BaseInput v-model="regEmail" type="email" placeholder="Email">
-                <template #icon><EmailIcon /></template>
-              </BaseInput>
-
-              <BaseInput v-model="regFullName" placeholder="ФИО">
+              <BaseInput 
+                v-model="regFullName" 
+                placeholder="ФИО"
+                :disabled="isRegLoading"
+              >
                 <template #icon><IdCardIcon /></template>
               </BaseInput>
 
-              <BaseInput v-model="regGroup" placeholder="Группа (например, 23212)">
-                <template #icon><GroupIcon /></template>
+              <BaseInput 
+                v-model="regEmail" 
+                type="email" 
+                placeholder="Email"
+                :disabled="isRegLoading"
+              >
+                <template #icon><UserIcon /></template>
               </BaseInput>
 
-              <BaseInput v-model="regRoom" placeholder="Номер комнаты (например, 107М)">
-                <template #icon><HomeIcon /></template>
-              </BaseInput>
-
-              <BaseInput v-model="regContract" placeholder="Номер договора найма">
-                <template #icon><DocumentIcon /></template>
-              </BaseInput>
-
-              <BaseInput v-model="regPassword" type="password" placeholder="Пароль">
+              <BaseInput 
+                v-model="regPassword" 
+                type="password" 
+                placeholder="Пароль (мин. 6 символов)"
+                :disabled="isRegLoading"
+              >
                 <template #icon><LockIcon /></template>
               </BaseInput>
 
-              <BaseInput v-model="regPasswordConfirm" type="password" placeholder="Подтвердите пароль">
+              <BaseInput 
+                v-model="regPasswordConfirm" 
+                type="password" 
+                placeholder="Подтвердите пароль"
+                :disabled="isRegLoading"
+              >
                 <template #icon><LockIcon /></template>
               </BaseInput>
+
+              <!-- Ошибка регистрации -->
+              <div v-if="regError" class="error-message">
+                {{ regError }}
+              </div>
+
+              <!-- Информация -->
+              <p class="info-text">
+                Регистрация пока недоступна. Используйте тестовые учетные данные.
+              </p>
             </div>
 
-            <BaseButton class="submit-btn" @click="handleRegister">ЗАРЕГИСТРИРОВАТЬСЯ</BaseButton>
+            <BaseButton 
+              class="submit-btn" 
+              :disabled="isRegLoading"
+              @click="handleRegister"
+            >
+              {{ isRegLoading ? 'РЕГИСТРАЦИЯ...' : 'ЗАРЕГИСТРИРОВАТЬСЯ' }}
+            </BaseButton>
           </form>
         </div>
       </div>
@@ -307,6 +414,53 @@ const handleRegister = () => {
 .modal-enter-from .modal-card,
 .modal-leave-to .modal-card {
   transform: scale(0.9) translateY(-20px);
+}
+
+  .submit-btn {
+    &:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+  }
+
+.error-message {
+  padding: 12px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 8px;
+  color: #ef4444;
+  font-size: 14px;
+  text-align: center;
+  margin-top: 8px;
+}
+
+.hint-text {
+  margin-top: 16px;
+  padding: 12px;
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: 8px;
+  color: #60a5fa;
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: center;
+
+  strong {
+    color: #3b82f6;
+    font-weight: 600;
+  }
+}
+
+.info-text {
+  margin-top: 8px;
+  padding: 10px;
+  background: rgba(234, 179, 8, 0.1);
+  border: 1px solid rgba(234, 179, 8, 0.3);
+  border-radius: 8px;
+  color: #eab308;
+  font-size: 13px;
+  line-height: 1.4;
+  text-align: center;
 }
 
 @media (max-width: 540px) {

@@ -1,10 +1,9 @@
 <script setup lang="ts">
 import { RouterLink } from 'vue-router'
+import { useAuth } from '@/composables/useAuth'
 
 defineProps<{
   variant?: 'light' | 'dark'
-  isLoggedIn?: boolean
-  userEmail?: string
 }>()
 
 const emit = defineEmits<{
@@ -13,11 +12,19 @@ const emit = defineEmits<{
   rulesClick: []
 }>()
 
+const { isLoggedIn, user, logout } = useAuth()
+
 const scrollToSection = (id: string) => {
   const element = document.getElementById(id)
   if (element) {
     element.scrollIntoView({ behavior: 'smooth' })
   }
+}
+
+const handleLogout = () => {
+  logout()
+  // Можно добавить редирект на главную если нужно
+  // window.location.href = '/'
 }
 </script>
 
@@ -30,8 +37,11 @@ const scrollToSection = (id: string) => {
         <button class="nav-link nav-btn" @click="emit('bookingClick')">ЗАПИСЬ</button>
         <template v-if="isLoggedIn">
           <RouterLink to="/profile" class="profile-link">
-            {{ userEmail }}
+            {{ user?.name || 'Профиль' }}
           </RouterLink>
+          <button class="logout-btn" @click="handleLogout" title="Выход">
+            Выйти
+          </button>
         </template>
         <button 
           v-else 
@@ -133,14 +143,31 @@ const scrollToSection = (id: string) => {
   background: rgba(255, 255, 255, 0.25);
 }
 
-.user-email {
+.logout-btn {
+  background: none;
+  border: 1px solid #3D4F61;
   color: #3D4F61;
-  font-size: 16px;
+  border-radius: 20px;
+  padding: 8px 20px;
+  font-size: 14px;
   font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
 }
 
-.header.dark .user-email {
+.logout-btn:hover {
+  background-color: #3D4F61;
   color: #FFFFFF;
+}
+
+.header.dark .logout-btn {
+  border-color: #FFFFFF;
+  color: #FFFFFF;
+}
+
+.header.dark .logout-btn:hover {
+  background-color: #FFFFFF;
+  color: #3D4F61;
 }
 
 .login-btn {

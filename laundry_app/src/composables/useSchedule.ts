@@ -1,118 +1,114 @@
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 
-export interface ScheduleSlot {
+const API_BASE = '/api'
+
+export interface Machine {
   id: string
-  date: string // формат YYYY-MM-DD
-  timeSlot: string
-  machineId: number
-  isBlocked: boolean
-  reason?: string
+  name: string
+  status: string
+  createdAt: string
+  alreadyBlocked: boolean
 }
 
-const SCHEDULE_KEY = 'laundry_schedule'
+export interface Timeslot {
+  id: string
+  startTime: string
+  endTime: string
+  isAvailable: boolean
+  machineId: string
+  createdAt: string
+  slotId: string
+}
+
+export interface Booking {
+  id: string
+  userId: string
+  machineId: string
+  slotId: string
+  state: string
+  createdAt: string
+}
+
+export interface ScheduleData {
+  machines: Machine[]
+  timeslots: Timeslot[]
+  bookings: Booking[]
+}
 
 // Глобальное состояние
-const blockedSlots = ref<ScheduleSlot[]>([])
-let initialized = false
-
-// Инициализация из localStorage
-const initFromStorage = () => {
-  if (initialized) return
-  
-  try {
-    const stored = localStorage.getItem(SCHEDULE_KEY)
-    if (stored) {
-      blockedSlots.value = JSON.parse(stored)
-    }
-    initialized = true
-  } catch {
-    // ignore
-  }
-}
-
-// Сохранение в localStorage
-const saveToStorage = () => {
-  localStorage.setItem(SCHEDULE_KEY, JSON.stringify(blockedSlots.value))
-}
-
-// Генерация ID
-const generateId = () => {
-  return 'slot_' + Math.random().toString(36).substring(2) + Date.now().toString(36)
-}
+const scheduleData = ref<ScheduleData | null>(null)
+const loading = ref(false)
+const error = ref<string | null>(null)
 
 export function useSchedule() {
-  initFromStorage()
+  // Получить расписание на определенную дату
+  const fetchSchedule = async (date: string, userId: string) => {
+    loading.value = true
+    error.value = null
 
-  // Заблокировать слот
-  const blockSlot = (date: string, timeSlot: string, machineId: number, reason?: string) => {
-    const existingIndex = blockedSlots.value.findIndex(
-      s => s.date === date && s.timeSlot === timeSlot && s.machineId === machineId
-    )
-    
-    if (existingIndex === -1) {
-      const newSlot: ScheduleSlot = {
-        id: generateId(),
-        date,
-        timeSlot,
-        machineId,
-        isBlocked: true,
-        reason
+    try {
+      const response = await fetch(
+        `${API_BASE}/schedule?date=${date}&userId=${userId}`
+      )
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch schedule')
       }
-      blockedSlots.value.push(newSlot)
-      saveToStorage()
-      return newSlot
+
+      const data = await response.json()
+      scheduleData.value = data
+
+      return { success: true, data }
+    } catch (err) {
+      error.value = 'Network error. Please try again.'
+      console.error('Fetch schedule error:', err)
+      return { success: false, error: error.value }
+    } finally {
+      loading.value = false
     }
-    return null
   }
 
-  // Разблокировать слот
-  const unblockSlot = (id: string) => {
-    const index = blockedSlots.value.findIndex(s => s.id === id)
-    if (index !== -1) {
-      blockedSlots.value.splice(index, 1)
-      saveToStorage()
-      return true
-    }
-    return false
-  }
-
-  // Проверить, заблокирован ли слот
-  const isSlotBlocked = (date: string, timeSlot: string, machineId: number) => {
-    return blockedSlots.value.some(
-      s => s.date === date && s.timeSlot === timeSlot && s.machineId === machineId && s.isBlocked
+  // Получить доступные слоты для машины на дату
+  const getAvailableSlots = (machineId: string) => {
+    if (!scheduleData.value) return []
+    
+    return scheduleData.value.timeslots.filter(
+      slot => slot.machineId === machineId && slot.isAvailable
     )
   }
 
-  // Заблокировать всю дату для всех машинок
-  const blockDate = (date: string, machineIds: number[], reason?: string) => {
-    const timeSlots = ['9:45 - 11:45', '14:00 - 16:00', '18:00 - 20:00', '21:00 - 23:00']
+  // Получить все бронирования пользователя
+  const getUserBookings = (userId: string) => {
+    if (!scheduleData.value) return []
     
-    machineIds.forEach(machineId => {
-      timeSlots.forEach(timeSlot => {
-        blockSlot(date, timeSlot, machineId, reason)
-      })
-    })
-    saveToStorage()
+    return scheduleData.value.bookings.filter(
+      booking => booking.userId === userId && booking.state === 'active'
+    )
   }
 
-  // Разблокировать всю дату
-  const unblockDate = (date: string) => {
-    blockedSlots.value = blockedSlots.value.filter(s => s.date !== date)
-    saveToStorage()
+  // Получить информацию о машине
+  const getMachine = (machineId: string) => {
+    if (!scheduleData.value) return null
+    
+    return scheduleData.value.machines.find(m => m.id === machineId) || null
   }
 
-  // Получить все заблокированные слоты для даты
-  const getBlockedSlotsForDate = (date: string) => {
-    return blockedSlots.value.filter(s => s.date === date)
+  // Проверить доступность слота
+  const isSlotAvailable = (slotId: string) => {
+    if (!scheduleData.value) return false
+    
+    const slot = scheduleData.value.timeslots.find(s => s.id === slotId)
+    return slot?.isAvailable || false
   }
 
   return {
-    blockedSlots,
-    blockSlot,
-    unblockSlot,
-    isSlotBlocked,
-    blockDate,
-    unblockDate,
-    getBlockedSlotsForDate
+    scheduleData,
+    loading,
+    error,
+    fetchSchedule,
+    getAvailableSlots,
+    getUserBookings,
+    getMachine,
+    isSlotAvailable
   }
 }

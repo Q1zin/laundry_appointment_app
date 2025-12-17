@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import TheHeader from '@/components/layout/TheHeader.vue'
 import HeroSection from '@/components/sections/HeroSection.vue'
 import RulesSection from '@/components/sections/RulesSection.vue'
@@ -9,12 +9,10 @@ import AuthModal from '@/components/modals/AuthModal.vue'
 import BookingModal from '@/components/modals/BookingModal.vue'
 import { useAuth } from '@/composables/useAuth'
 
-const { isLoggedIn, user } = useAuth()
+const { isLoggedIn } = useAuth()
 
 const isAuthModalOpen = ref(false)
 const isBookingModalOpen = ref(false)
-
-const userEmail = computed(() => user.value?.email || '')
 
 const openAuthModal = () => {
   isAuthModalOpen.value = true
@@ -51,8 +49,6 @@ const scrollToRules = () => {
 <template>
   <div class="home-page">
     <TheHeader 
-      :is-logged-in="isLoggedIn"
-      :user-email="userEmail"
       @login-click="openAuthModal"
       @booking-click="handleBookingClick"
       @rules-click="scrollToRules"

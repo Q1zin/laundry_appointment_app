@@ -1,15 +1,16 @@
 import { ref, computed } from 'vue'
 
 interface User {
-  fullName: string
+  id: string
+  name: string
   email: string
-  group: string
-  room: string
-  contract: string
+  role: string
+  blocked: boolean
 }
 
 const TOKEN_KEY = 'auth_token'
 const USER_KEY = 'auth_user'
+const API_BASE = '/api'
 
 // Глобальное реактивное состояние
 const user = ref<User | null>(null)
@@ -62,53 +63,64 @@ export function useAuth() {
   }
 
   const isLoggedIn = computed(() => !!token.value && !!user.value)
+  const isAdmin = computed(() => user.value?.role === 'admin')
 
-  const login = (email: string, _password: string) => {
-    // Фейковый логин - просто создаём пользователя
-    const fakeUser: User = {
-      fullName: 'Иванов Иван Иванович',
-      email: email,
-      group: '23212',
-      room: '107М',
-      contract: '123456789'
+  const login = async (name: string, password: string) => {
+    try {
+      const response = await fetch(`${API_BASE}/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ username: name, password })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok || !data.success) {
+        return { 
+          success: false, 
+          message: data.message || 'Login failed' 
+        }
+      }
+
+      // Сохраняем токен
+      token.value = data.token
+      setCookie(TOKEN_KEY, data.token)
+
+      // Создаём объект пользователя
+      const userData: User = {
+        id: name, // используем name как id
+        name: name,
+        email: `${name}@laundry.local`,
+        role: data.role,
+        blocked: false
+      }
+
+      user.value = userData
+      localStorage.setItem(USER_KEY, JSON.stringify(userData))
+
+      return { success: true, message: data.message }
+    } catch (error) {
+      console.error('Login error:', error)
+      return { 
+        success: false, 
+        message: 'Network error. Please try again.' 
+      }
     }
-
-    const fakeToken = generateFakeToken()
-    
-    token.value = fakeToken
-    user.value = fakeUser
-    
-    setCookie(TOKEN_KEY, fakeToken)
-    localStorage.setItem(USER_KEY, JSON.stringify(fakeUser))
-
-    return { success: true }
   }
 
-  const register = (userData: {
+  const register = async (userData: {
     email: string
-    fullName: string
-    group: string
-    room: string
-    contract: string
+    name: string
     password: string
   }) => {
-    const newUser: User = {
-      fullName: userData.fullName,
-      email: userData.email,
-      group: userData.group,
-      room: userData.room,
-      contract: userData.contract
+    // Backend пока не поддерживает регистрацию
+    // В будущем можно добавить POST /api/auth/register
+    return { 
+      success: false, 
+      message: 'Registration not implemented yet' 
     }
-
-    const fakeToken = generateFakeToken()
-    
-    token.value = fakeToken
-    user.value = newUser
-    
-    setCookie(TOKEN_KEY, fakeToken)
-    localStorage.setItem(USER_KEY, JSON.stringify(newUser))
-
-    return { success: true }
   }
 
   const logout = () => {
@@ -127,6 +139,7 @@ export function useAuth() {
     user,
     token,
     isLoggedIn,
+    isAdmin,
     login,
     register,
     logout,

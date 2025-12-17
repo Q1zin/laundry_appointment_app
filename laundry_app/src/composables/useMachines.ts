@@ -1,101 +1,91 @@
 import { ref } from 'vue'
 
+const API_BASE = '/api'
+
 export interface Machine {
-  id: number
+  id: string
   name: string
-  isActive: boolean
+  status: string
+  alreadyBlocked: boolean
 }
 
-const MACHINES_KEY = 'laundry_machines'
-
-// Глобальное состояние
 const machines = ref<Machine[]>([])
-let initialized = false
-
-// Инициализация из localStorage
-const initFromStorage = () => {
-  if (initialized) return
-  
-  try {
-    const stored = localStorage.getItem(MACHINES_KEY)
-    if (stored) {
-      machines.value = JSON.parse(stored)
-    } else {
-      // Начальные машинки по умолчанию
-      machines.value = [
-        { id: 1, name: 'Машинка №1', isActive: true },
-        { id: 2, name: 'Машинка №2', isActive: true },
-        { id: 3, name: 'Машинка №3', isActive: true },
-        { id: 4, name: 'Машинка №4', isActive: true }
-      ]
-      saveToStorage()
-    }
-    initialized = true
-  } catch {
-    // ignore
-  }
-}
-
-// Сохранение в localStorage
-const saveToStorage = () => {
-  localStorage.setItem(MACHINES_KEY, JSON.stringify(machines.value))
-}
+const loading = ref(false)
+const error = ref<string | null>(null)
 
 export function useMachines() {
-  initFromStorage()
+  // Блокировать машину (Админ)
+  const blockMachine = async (machineId: string) => {
+    loading.value = true
+    error.value = null
 
-  const addMachine = (name: string) => {
-    const maxId = machines.value.reduce((max, m) => Math.max(max, m.id), 0)
-    const newMachine: Machine = {
-      id: maxId + 1,
-      name,
-      isActive: true
+    try {
+      const response = await fetch(`${API_BASE}/admin/machines/block`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ machineId })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok || !data.result) {
+        error.value = data.message || 'Failed to block machine'
+        return { success: false, message: error.value }
+      }
+
+      return { success: true, message: data.message }
+    } catch (err) {
+      error.value = 'Network error. Please try again.'
+      console.error('Block machine error:', err)
+      return { success: false, message: error.value }
+    } finally {
+      loading.value = false
     }
-    machines.value.push(newMachine)
-    saveToStorage()
-    return newMachine
   }
 
-  const removeMachine = (id: number) => {
-    const index = machines.value.findIndex(m => m.id === id)
-    if (index !== -1) {
-      machines.value.splice(index, 1)
-      saveToStorage()
-      return true
-    }
-    return false
-  }
+  // Разблокировать машину (Админ)
+  const unblockMachine = async (machineId: string) => {
+    loading.value = true
+    error.value = null
 
-  const toggleMachine = (id: number) => {
-    const machine = machines.value.find(m => m.id === id)
-    if (machine) {
-      machine.isActive = !machine.isActive
-      saveToStorage()
-      return true
-    }
-    return false
-  }
+    try {
+      const response = await fetch(`${API_BASE}/admin/machines/unblock`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ machineId })
+      })
 
-  const updateMachineName = (id: number, name: string) => {
-    const machine = machines.value.find(m => m.id === id)
-    if (machine) {
-      machine.name = name
-      saveToStorage()
-      return true
+      const data = await response.json()
+
+      if (!response.ok || !data.result) {
+        error.value = data.message || 'Failed to unblock machine'
+        return { success: false, message: error.value }
+      }
+
+      return { success: true, message: data.message }
+    } catch (err) {
+      error.value = 'Network error. Please try again.'
+      console.error('Unblock machine error:', err)
+      return { success: false, message: error.value }
+    } finally {
+      loading.value = false
     }
-    return false
   }
 
   const getActiveMachines = () => {
-    return machines.value.filter(m => m.isActive)
+    return machines.value.filter(m => m.status === 'available')
   }
 
   return {
     machines,
-    addMachine,
-    removeMachine,
-    toggleMachine,
-    updateMachineName,
+    loading,
+    error,
+    blockMachine,
+    unblockMachine,
     getActiveMachines
   }
 }

@@ -1,158 +1,151 @@
 import { ref, computed } from 'vue'
 
+const API_BASE = '/api'
+
 export interface Booking {
   id: string
-  machine: number
-  machineName?: string
-  date: string
-  dayName: string
-  dayNumber: number
-  time: string
-  fullName: string
-  room: string
-  userEmail?: string
-  createdAt: Date
+  userId: string
+  machineId: string
+  slotId: string
+  state: 'active' | 'canceled' | 'completed'
+  createdAt: string
 }
 
-const BOOKINGS_KEY = 'user_bookings'
-const ALL_BOOKINGS_KEY = 'all_bookings'
-
-// Глобальное реактивное состояние
+// Локальное состояние для кэширования
 const bookings = ref<Booking[]>([])
-
-// Инициализация из localStorage
-const initFromStorage = () => {
-  try {
-    const stored = localStorage.getItem(BOOKINGS_KEY)
-    if (stored) {
-      bookings.value = JSON.parse(stored)
-    }
-  } catch {
-    // ignore parse errors
-  }
-}
-
-// Сохранение в localStorage
-const saveToStorage = () => {
-  localStorage.setItem(BOOKINGS_KEY, JSON.stringify(bookings.value))
-}
-
-// Генерация ID
-const generateId = () => {
-  return 'booking_' + Math.random().toString(36).substring(2) + Date.now().toString(36)
-}
+const loading = ref(false)
+const error = ref<string | null>(null)
 
 export function useBookings() {
-  // Инициализация при первом использовании
-  if (bookings.value.length === 0) {
-    initFromStorage()
+  // Создать бронирование
+  const createBooking = async (
+    userId: string,
+    machineId: string,
+    slotId: string
+  ) => {
+    loading.value = true
+    error.value = null
+
+    try {
+      const response = await fetch(`${API_BASE}/bookings/create`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId,
+          machineId,
+          slotId
+        })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok || !data.result) {
+        error.value = data.message || 'Failed to create booking'
+        return { success: false, message: error.value }
+      }
+
+      return { success: true, message: data.message }
+    } catch (err) {
+      error.value = 'Network error. Please try again.'
+      console.error('Create booking error:', err)
+      return { success: false, message: error.value }
+    } finally {
+      loading.value = false
+    }
   }
 
+  // Отменить бронирование
+  const cancelBooking = async (bookingId: string, userId: string) => {
+    loading.value = true
+    error.value = null
+
+    try {
+      const response = await fetch(`${API_BASE}/bookings/cancel`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          bookingId,
+          userId
+        })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok || !data.result) {
+        error.value = data.message || 'Failed to cancel booking'
+        return { success: false, message: error.value }
+      }
+
+      return { success: true, message: data.message }
+    } catch (err) {
+      error.value = 'Network error. Please try again.'
+      console.error('Cancel booking error:', err)
+      return { success: false, message: error.value }
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // Перенести бронирование
+  const rescheduleBooking = async (
+    bookingId: string,
+    newSlotId: string,
+    userId: string
+  ) => {
+    loading.value = true
+    error.value = null
+
+    try {
+      const response = await fetch(`${API_BASE}/bookings/reschedule`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          bookingId,
+          newSlotId,
+          userId
+        })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok || !data.result) {
+        error.value = data.message || 'Failed to reschedule booking'
+        return { success: false, message: error.value }
+      }
+
+      return { success: true, message: data.message }
+    } catch (err) {
+      error.value = 'Network error. Please try again.'
+      console.error('Reschedule booking error:', err)
+      return { success: false, message: error.value }
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // Фильтры для локального состояния
   const activeBookings = computed(() => {
-    const now = new Date()
-    return bookings.value.filter(booking => {
-      // Простая фильтрация - показываем все записи
-      // В реальном приложении здесь была бы проверка даты
-      return true
-    })
+    return bookings.value.filter(b => b.state === 'active')
   })
 
-  const addBooking = (bookingData: Omit<Booking, 'id' | 'createdAt'>) => {
-    const newBooking: Booking = {
-      ...bookingData,
-      id: generateId(),
-      createdAt: new Date()
-    }
-    bookings.value.push(newBooking)
-    saveToStorage()
-    
-    // Также сохраняем в общий список для админа
-    try {
-      const allBookingsStr = localStorage.getItem(ALL_BOOKINGS_KEY)
-      const allBookings = allBookingsStr ? JSON.parse(allBookingsStr) : []
-      allBookings.push(newBooking)
-      localStorage.setItem(ALL_BOOKINGS_KEY, JSON.stringify(allBookings))
-    } catch {
-      // ignore
-    }
-    
-    return newBooking
-  }
-
-  const cancelBooking = (bookingId: string) => {
-    const index = bookings.value.findIndex(b => b.id === bookingId)
-    if (index !== -1) {
-      bookings.value.splice(index, 1)
-      saveToStorage()
-      
-      // Также удаляем из общего списка
-      try {
-        const allBookingsStr = localStorage.getItem(ALL_BOOKINGS_KEY)
-        if (allBookingsStr) {
-          const allBookings = JSON.parse(allBookingsStr)
-          const allIndex = allBookings.findIndex((b: Booking) => b.id === bookingId)
-          if (allIndex !== -1) {
-            allBookings.splice(allIndex, 1)
-            localStorage.setItem(ALL_BOOKINGS_KEY, JSON.stringify(allBookings))
-          }
-        }
-      } catch {
-        // ignore
-      }
-      
-      return true
-    }
-    return false
-  }
-
-  const clearAllBookings = () => {
-    bookings.value = []
-    localStorage.removeItem(BOOKINGS_KEY)
-  }
-
-  const updateBooking = (bookingId: string, bookingData: Omit<Booking, 'id' | 'createdAt'>) => {
-    const index = bookings.value.findIndex(b => b.id === bookingId)
-    if (index !== -1) {
-      const existing = bookings.value[index]
-      const updatedBooking: Booking = {
-        ...bookingData,
-        id: bookingId,
-        createdAt: existing ? existing.createdAt : new Date()
-      }
-      bookings.value[index] = updatedBooking
-      saveToStorage()
-      
-      // Также обновляем в общем списке для админа
-      try {
-        const allBookingsStr = localStorage.getItem(ALL_BOOKINGS_KEY)
-        if (allBookingsStr) {
-          const allBookings = JSON.parse(allBookingsStr)
-          const allIndex = allBookings.findIndex((b: Booking) => b.id === bookingId)
-          if (allIndex !== -1) {
-            allBookings[allIndex] = updatedBooking
-            localStorage.setItem(ALL_BOOKINGS_KEY, JSON.stringify(allBookings))
-          }
-        }
-      } catch {
-        // ignore
-      }
-      
-      return updatedBooking
-    }
-    return null
-  }
-
-  const getBookingById = (bookingId: string) => {
-    return bookings.value.find(b => b.id === bookingId) || null
+  const getUserBookings = (userId: string) => {
+    return bookings.value.filter(b => b.userId === userId && b.state === 'active')
   }
 
   return {
     bookings,
+    loading,
+    error,
     activeBookings,
-    addBooking,
+    createBooking,
     cancelBooking,
-    clearAllBookings,
-    updateBooking,
-    getBookingById
+    rescheduleBooking,
+    getUserBookings
   }
 }

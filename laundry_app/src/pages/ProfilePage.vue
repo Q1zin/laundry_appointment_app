@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import TheHeader from '@/components/layout/TheHeader.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -12,11 +12,13 @@ import { useAuth } from '@/composables/useAuth'
 import { useBookings, type Booking } from '@/composables/useBookings'
 
 const router = useRouter()
-const { isLoggedIn, user, logout, deleteAccount } = useAuth()
-const { activeBookings, cancelBooking, clearAllBookings } = useBookings()
+const { isLoggedIn, user, logout } = useAuth()
+const { activeBookings, cancelBooking } = useBookings()
 
 const isBookingModalOpen = ref(false)
 const editingBooking = ref<Booking | null>(null)
+const isLoading = ref(false)
+const error = ref<string | null>(null)
 
 // Редирект если не авторизован
 onMounted(() => {
@@ -25,29 +27,29 @@ onMounted(() => {
   }
 })
 
-const userEmail = computed(() => user.value?.email || '')
-const userFullName = computed(() => user.value?.fullName || '')
-const userGroup = computed(() => user.value?.group || '')
-const userRoom = computed(() => user.value?.room || '')
-const userContract = computed(() => user.value?.contract || '')
-
-const handleCancelBooking = (bookingId: string) => {
+const handleCancelBooking = async (bookingId: string) => {
+  if (!user.value?.id) return
+  
   if (confirm('Вы уверены, что хотите отменить эту запись?')) {
-    cancelBooking(bookingId)
+    isLoading.value = true
+    error.value = null
+    
+    const result = await cancelBooking(bookingId, String(user.value.id))
+    
+    isLoading.value = false
+    
+    if (result.success) {
+      alert('Запись успешно отменена')
+    } else {
+      error.value = result.message || 'Ошибка при отмене записи'
+      alert(error.value)
+    }
   }
 }
 
 const handleLogout = () => {
   logout()
   router.push('/')
-}
-
-const handleDeleteAccount = () => {
-  if (confirm('Вы уверены, что хотите удалить аккаунт? Это действие необратимо.')) {
-    clearAllBookings()
-    deleteAccount()
-    router.push('/')
-  }
 }
 
 const openBookingModal = () => {
@@ -69,8 +71,6 @@ const closeBookingModal = () => {
 <template>
   <div class="profile-page" v-if="isLoggedIn">
     <TheHeader 
-      :is-logged-in="isLoggedIn"
-      :user-email="userEmail"
       @booking-click="openBookingModal"
       @rules-click="router.push('/#rules')"
     />
@@ -84,24 +84,16 @@ const closeBookingModal = () => {
           <div class="profile-card">
             <div class="profile-info">
               <div class="info-row">
-                <span class="info-label">Email:</span>
-                <span class="info-value">{{ userEmail }}</span>
+                <span class="info-label">Логин:</span>
+                <span class="info-value">{{ user?.name || 'Не указан' }}</span>
               </div>
               <div class="info-row">
-                <span class="info-label">ФИО:</span>
-                <span class="info-value">{{ userFullName }}</span>
+                <span class="info-label">Роль:</span>
+                <span class="info-value">{{ user?.role === 'ADMIN' ? 'Администратор' : 'Пользователь' }}</span>
               </div>
               <div class="info-row">
-                <span class="info-label">Группа:</span>
-                <span class="info-value">{{ userGroup }}</span>
-              </div>
-              <div class="info-row">
-                <span class="info-label">Комната:</span>
-                <span class="info-value">{{ userRoom }}</span>
-              </div>
-              <div class="info-row">
-                <span class="info-label">Договор:</span>
-                <span class="info-value">{{ userContract }}</span>
+                <span class="info-label">ID:</span>
+                <span class="info-value">{{ user?.id || 'Не указан' }}</span>
               </div>
             </div>
           </div>
@@ -111,7 +103,15 @@ const closeBookingModal = () => {
         <section class="bookings-section">
           <h2 class="section-title">АКТИВНЫЕ ЗАПИСИ</h2>
           
-          <div v-if="activeBookings.length === 0" class="no-bookings">
+          <div v-if="isLoading" class="loading-state">
+            <p>Загрузка записей...</p>
+          </div>
+
+          <div v-else-if="error" class="error-state">
+            <p class="error-message">{{ error }}</p>
+          </div>
+          
+          <div v-else-if="activeBookings.length === 0" class="no-bookings">
             <WashingMachineOutlineIcon :size="64" color="#9CA3AF" />
             <p>У вас пока нет активных записей на стирку</p>
             <BaseButton @click="openBookingModal">Записаться на стирку</BaseButton>
@@ -127,21 +127,14 @@ const closeBookingModal = () => {
                 <WashingMachineOutlineIcon :size="40" color="#3D4F61" />
               </div>
               <div class="booking-details">
-                <div class="booking-machine">Машинка №{{ booking.machine }}</div>
+                <div class="booking-machine">Машинка #{{ booking.machineId }}</div>
                 <div class="booking-datetime">
                   <CalendarIcon :size="16" color="#6B7280" />
-                  <span>{{ booking.dayName }}, {{ booking.dayNumber }} — {{ booking.time }}</span>
+                  <span>Слот #{{ booking.slotId }}</span>
                 </div>
-                <div class="booking-room">Комната: {{ booking.room }}</div>
+                <div class="booking-user">Пользователь ID: {{ booking.userId }}</div>
               </div>
               <div class="booking-actions">
-                <button 
-                  class="edit-btn" 
-                  @click="openEditBookingModal(booking)"
-                  title="Перенести запись"
-                >
-                  <EditIcon :size="20" color="#3B82F6" />
-                </button>
                 <button 
                   class="cancel-btn" 
                   @click="handleCancelBooking(booking.id)"
@@ -161,14 +154,6 @@ const closeBookingModal = () => {
               ВЫЙТИ ИЗ АККАУНТА
             </button>
           </div>
-        </section>
-
-        <!-- Удаление аккаунта -->
-        <section class="danger-section">
-          <p class="danger-warning">Удаление аккаунта приведёт к потере всех данных. Это действие необратимо.</p>
-          <button class="action-btn delete-btn" @click="handleDeleteAccount">
-            УДАЛИТЬ АККАУНТ
-          </button>
         </section>
       </div>
     </main>
@@ -251,6 +236,8 @@ const closeBookingModal = () => {
   margin-bottom: 50px;
 }
 
+.loading-state,
+.error-state,
 .no-bookings {
   background: #FFFFFF;
   border-radius: 16px;
@@ -261,6 +248,20 @@ const closeBookingModal = () => {
   flex-direction: column;
   align-items: center;
   gap: 20px;
+}
+
+.loading-state p {
+  font-size: 18px;
+  color: #3B82F6;
+}
+
+.error-state .error-message {
+  font-size: 16px;
+  color: #EF4444;
+  padding: 12px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 8px;
 }
 
 .no-bookings p {
