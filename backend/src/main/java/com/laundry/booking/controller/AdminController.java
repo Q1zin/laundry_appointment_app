@@ -1,10 +1,7 @@
 package com.laundry.booking.controller;
 
-import com.laundry.booking.dto.AdminBookingDto;
-import com.laundry.booking.dto.BookingResult;
-import com.laundry.booking.dto.DateRequest;
-import com.laundry.booking.dto.MachineRequest;
-import com.laundry.booking.dto.UserRequest;
+import com.laundry.booking.dto.*;
+import com.laundry.booking.entity.Machine;
 import com.laundry.booking.entity.User;
 import com.laundry.booking.service.AdminService;
 import lombok.RequiredArgsConstructor;
@@ -15,16 +12,6 @@ import java.util.List;
 
 /**
  * Admin Controller - Admin Panel UI
- * Endpoints:
- * - POST /api/admin/machines/block
- * - POST /api/admin/machines/unblock
- * - POST /api/admin/bookings/open
- * - POST /api/admin/bookings/close
- * - DELETE /api/admin/bookings/:bookingId
- * - GET /api/admin/bookings
- * - GET /api/admin/users
- * - POST /api/admin/users/block
- * - POST /api/admin/users/unblock
  */
 @RestController
 @RequestMapping("/api/admin")
@@ -34,10 +21,41 @@ public class AdminController {
 
     private final AdminService adminService;
 
+    // ============= MACHINES =============
+
+    /**
+     * GET /api/admin/machines
+     * Response: List<Machine>
+     */
+    @GetMapping("/machines")
+    public ResponseEntity<List<Machine>> getAllMachines() {
+        List<Machine> machines = adminService.getAllMachines();
+        return ResponseEntity.ok(machines);
+    }
+
+    /**
+     * POST /api/admin/machines
+     * Body: { name: String }
+     * Response: Machine
+     */
+    @PostMapping("/machines")
+    public ResponseEntity<Machine> createMachine(@RequestBody CreateMachineRequest request) {
+        Machine machine = adminService.createMachine(request.getName());
+        return ResponseEntity.ok(machine);
+    }
+
+    /**
+     * DELETE /api/admin/machines/:machineId
+     * Response: { result: boolean, message: String }
+     */
+    @DeleteMapping("/machines/{machineId}")
+    public ResponseEntity<BookingResult> deleteMachine(@PathVariable String machineId) {
+        BookingResult result = adminService.deleteMachine(machineId);
+        return ResponseEntity.ok(result);
+    }
+
     /**
      * POST /api/admin/machines/block
-     * Body: { machineId: String }
-     * Response: { result: boolean, message: String }
      */
     @PostMapping("/machines/block")
     public ResponseEntity<BookingResult> blockMachine(@RequestBody MachineRequest request) {
@@ -47,8 +65,6 @@ public class AdminController {
 
     /**
      * POST /api/admin/machines/unblock
-     * Body: { machineId: String }
-     * Response: { result: boolean, message: String }
      */
     @PostMapping("/machines/unblock")
     public ResponseEntity<BookingResult> unblockMachine(@RequestBody MachineRequest request) {
@@ -56,41 +72,43 @@ public class AdminController {
         return ResponseEntity.ok(result);
     }
 
+    // ============= SCHEDULES =============
+
     /**
-     * POST /api/admin/bookings/open
-     * Body: { date: Date }
-     * Response: { result: boolean, message: String }
+     * GET /api/admin/schedules
+     * Response: List<ScheduleDto>
      */
-    @PostMapping("/bookings/open")
-    public ResponseEntity<BookingResult> openBooking(@RequestBody DateRequest request) {
-        BookingResult result = adminService.openBooking(request.getDate());
-        return ResponseEntity.ok(result);
+    @GetMapping("/schedules")
+    public ResponseEntity<List<ScheduleDto>> getAllSchedules() {
+        List<ScheduleDto> schedules = adminService.getAllSchedules();
+        return ResponseEntity.ok(schedules);
     }
 
     /**
-     * POST /api/admin/bookings/close
-     * Body: { date: Date }
-     * Response: { result: boolean, message: String }
+     * POST /api/admin/schedules
+     * Body: { date: LocalDate, isOpen: boolean, machineIds: List<String> }
+     * Response: ScheduleDto
      */
-    @PostMapping("/bookings/close")
-    public ResponseEntity<BookingResult> closeBooking(@RequestBody DateRequest request) {
-        BookingResult result = adminService.closeBooking(request.getDate());
-        return ResponseEntity.ok(result);
+    @PostMapping("/schedules")
+    public ResponseEntity<ScheduleDto> createOrUpdateSchedule(@RequestBody ScheduleRequest request) {
+        ScheduleDto schedule = adminService.createOrUpdateSchedule(request);
+        return ResponseEntity.ok(schedule);
     }
 
     /**
-     * DELETE /api/admin/bookings/:bookingId
+     * DELETE /api/admin/schedules/:scheduleId
      * Response: { result: boolean, message: String }
      */
-    @DeleteMapping("/bookings/{bookingId}")
-    public ResponseEntity<BookingResult> deleteBooking(@PathVariable String bookingId) {
-        BookingResult result = adminService.deleteBooking(bookingId);
+    @DeleteMapping("/schedules/{scheduleId}")
+    public ResponseEntity<BookingResult> deleteSchedule(@PathVariable String scheduleId) {
+        BookingResult result = adminService.deleteSchedule(scheduleId);
         return ResponseEntity.ok(result);
     }
+
+    // ============= BOOKINGS =============
 
     /**
      * GET /api/admin/bookings
-     * Response: List<AdminBookingDto>
      */
     @GetMapping("/bookings")
     public ResponseEntity<List<AdminBookingDto>> getAllBookings() {
@@ -99,8 +117,18 @@ public class AdminController {
     }
 
     /**
+     * DELETE /api/admin/bookings/:bookingId
+     */
+    @DeleteMapping("/bookings/{bookingId}")
+    public ResponseEntity<BookingResult> deleteBooking(@PathVariable String bookingId) {
+        BookingResult result = adminService.deleteBooking(bookingId);
+        return ResponseEntity.ok(result);
+    }
+
+    // ============= USERS =============
+
+    /**
      * GET /api/admin/users
-     * Response: List<User>
      */
     @GetMapping("/users")
     public ResponseEntity<List<User>> getAllUsers() {
@@ -110,8 +138,6 @@ public class AdminController {
 
     /**
      * POST /api/admin/users/block
-     * Body: { userId: String }
-     * Response: { result: boolean, message: String }
      */
     @PostMapping("/users/block")
     public ResponseEntity<BookingResult> blockUser(@RequestBody UserRequest request) {
@@ -121,8 +147,6 @@ public class AdminController {
 
     /**
      * POST /api/admin/users/unblock
-     * Body: { userId: String }
-     * Response: { result: boolean, message: String }
      */
     @PostMapping("/users/unblock")
     public ResponseEntity<BookingResult> unblockUser(@RequestBody UserRequest request) {

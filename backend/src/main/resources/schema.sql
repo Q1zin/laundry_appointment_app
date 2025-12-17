@@ -1,6 +1,7 @@
 -- Drop tables if exist
 DROP TABLE IF EXISTS bookings CASCADE;
 DROP TABLE IF EXISTS timeslots CASCADE;
+DROP TABLE IF EXISTS schedule_machines CASCADE;
 DROP TABLE IF EXISTS schedules CASCADE;
 DROP TABLE IF EXISTS machines CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
@@ -59,6 +60,16 @@ CREATE TABLE schedules (
     date DATE NOT NULL UNIQUE,
     is_open BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create schedule_machines table (связь расписания с машинками)
+CREATE TABLE schedule_machines (
+    id VARCHAR(255) PRIMARY KEY,
+    schedule_id VARCHAR(255) NOT NULL,
+    machine_id VARCHAR(255) NOT NULL,
+    FOREIGN KEY (schedule_id) REFERENCES schedules(id) ON DELETE CASCADE,
+    FOREIGN KEY (machine_id) REFERENCES machines(id) ON DELETE CASCADE,
+    UNIQUE(schedule_id, machine_id)
 );
 
 -- Create indexes for better performance

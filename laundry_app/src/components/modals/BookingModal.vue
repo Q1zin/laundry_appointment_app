@@ -128,7 +128,16 @@ const availableSlots = computed(() => {
 })
 
 // Форматирование времени из ISO в HH:MM
+// Важно: сервер возвращает время без timezone (LocalDateTime),
+// парсим его напрямую чтобы избежать сдвига из-за timezone
 const formatTime = (isoString: string) => {
+  // Если строка в формате "2025-12-17T10:00:00", парсим напрямую
+  const timePart = isoString.split('T')[1]
+  if (timePart) {
+    const [hours, minutes] = timePart.split(':')
+    return `${hours}:${minutes}`
+  }
+  // Fallback на Date если формат другой
   const date = new Date(isoString)
   const hours = date.getHours()
   const minutes = date.getMinutes()

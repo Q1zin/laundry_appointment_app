@@ -10,6 +10,7 @@ import CalendarIcon from '@/components/icons/CalendarIcon.vue'
 import TrashIcon from '@/components/icons/TrashIcon.vue'
 import UserIcon from '@/components/icons/UserIcon.vue'
 import LockIcon from '@/components/icons/LockIcon.vue'
+import EditIcon from '@/components/icons/EditIcon.vue'
 import TheHeader from '@/components/layout/TheHeader.vue'
 
 interface AdminUser {
@@ -39,6 +40,21 @@ interface AdminBooking {
   createdAt: string
 }
 
+interface AdminMachine {
+  id: string
+  name: string
+  status: string
+  createdAt: string
+}
+
+interface AdminSchedule {
+  id: string
+  date: string
+  isOpen: boolean
+  machineIds: string[]
+  createdAt: string
+}
+
 const router = useRouter()
 const { isLoggedIn, isAdmin, user } = useAuth()
 
@@ -50,16 +66,37 @@ onMounted(() => {
 })
 
 // Состояние
-const activeTab = ref<'machines' | 'users' | 'bookings'>('machines')
+const activeTab = ref<'machines' | 'schedules' | 'users' | 'bookings'>('machines')
 const isLoading = ref(false)
 const actionError = ref<string | null>(null)
 const actionSuccess = ref<string | null>(null)
 
-// Расписание
-const { fetchSchedule } = useSchedule()
-const machines = ref<Machine[]>([])
-const selectedDate = ref<string>('')
-const selectedMachineId = ref<string | null>(null)
+// Машинки
+const adminMachines = ref<AdminMachine[]>([])
+const newMachineName = ref('')
+const showAddMachineForm = ref(false)
+
+// Расписания
+const schedules = ref<AdminSchedule[]>([])
+const showScheduleForm = ref(false)
+const scheduleForm = ref({
+  date: '',
+  isOpen: true,
+  machineIds: [] as string[],
+  timeSlots: [] as string[]
+})
+const editingScheduleId = ref<string | null>(null)
+
+// Доступные временные слоты
+const availableTimeSlots = [
+  '08:00-10:00',
+  '10:00-12:00',
+  '12:00-14:00',
+  '14:00-16:00',
+  '16:00-18:00',
+  '18:00-20:00',
+  '20:00-22:00'
+]
 
 // Пользователи
 const users = ref<AdminUser[]>([])
@@ -67,40 +104,60 @@ const users = ref<AdminUser[]>([])
 // Все записи
 const allBookings = ref<AdminBooking[]>([])
 
+// Временные данные для UI
+const { fetchSchedule } = useSchedule()
+const machines = ref<Machine[]>([])
+const selectedDate = ref<string>('')
+
 // Машинки (админ)
 const { blockMachine, unblockMachine } = useMachines()
 
 // Бронирования (админ)
 const { deleteBooking } = useAdminBookings()
 
-// Инициализация - загружаем текущее расписание
+// Инициализация
 onMounted(async () => {
   if (!user.value?.id) return
   
   const today = new Date().toISOString().split('T')[0]
   selectedDate.value = today || ''
   
-  await loadSchedule()
-  await loadUsers()
-  await loadAllBookings()
+  await loadAllData()
 })
 
-// Загрузка расписания
-const loadSchedule = async () => {
-  if (!user.value?.id || !selectedDate.value) return
-  
+const loadAllData = async () => {
   isLoading.value = true
-  actionError.value = null
-  
-  const result = await fetchSchedule(selectedDate.value, String(user.value.id))
-  
-  if (result.success && result.data) {
-    machines.value = result.data.machines
-  } else {
-    actionError.value = result.error || 'Не удалось загрузить расписание'
-  }
-  
+  await Promise.all([
+    loadAdminMachines(),
+    loadSchedules(),
+    loadUsers(),
+    loadAllBookings()
+  ])
   isLoading.value = false
+}
+
+// Загрузка машинок
+const loadAdminMachines = async () => {
+  try {
+    const response = await fetch('/api/admin/machines')
+    if (response.ok) {
+      adminMachines.value = await response.json()
+    }
+  } catch (err) {
+    console.error('Failed to load machines:', err)
+  }
+}
+
+// Загрузка расписаний
+const loadSchedules = async () => {
+  try {
+    const response = await fetch('/api/admin/schedules')
+    if (response.ok) {
+      schedules.value = await response.json()
+    }
+  } catch (err) {
+    console.error('Failed to load schedules:', err)
+  }
 }
 
 // Загрузка пользователей
@@ -127,7 +184,7 @@ const loadAllBookings = async () => {
   }
 }
 
-// Обработчики
+// Обработчики машинок
 const handleBlockMachine = async (machineId: string) => {
   if (!confirm('Заблокировать эту машинку?')) return
   
@@ -141,7 +198,7 @@ const handleBlockMachine = async (machineId: string) => {
   
   if (result.success) {
     actionSuccess.value = 'Машинка заблокирована'
-    await loadSchedule()
+    await loadAdminMachines()
   } else {
     actionError.value = result.message || 'Ошибка блокировки'
   }
@@ -160,10 +217,177 @@ const handleUnblockMachine = async (machineId: string) => {
   
   if (result.success) {
     actionSuccess.value = 'Машинка разблокирована'
-    await loadSchedule()
+    await loadAdminMachines()
   } else {
     actionError.value = result.message || 'Ошибка разблокировки'
   }
+}
+
+// Добавление машинки
+const handleAddMachine = async () => {
+  if (!newMachineName.value.trim()) {
+    actionError.value = 'Введите название машинки'
+    return
+  }
+  
+  isLoading.value = true
+  actionError.value = null
+  actionSuccess.value = null
+  
+  try {
+    const response = await fetch('/api/admin/machines', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: newMachineName.value })
+    })
+    
+    if (response.ok) {
+      actionSuccess.value = 'Машинка добавлена'
+      newMachineName.value = ''
+      showAddMachineForm.value = false
+      await loadAdminMachines()
+    } else {
+      actionError.value = 'Ошибка добавления машинки'
+    }
+  } catch (err) {
+    actionError.value = 'Ошибка соединения'
+  } finally {
+    isLoading.value = false
+  }
+}
+
+// Удаление машинки
+const handleDeleteMachine = async (machineId: string) => {
+  if (!confirm('Удалить эту машинку? Все связанные записи будут также удалены.')) return
+  
+  isLoading.value = true
+  actionError.value = null
+  actionSuccess.value = null
+  
+  try {
+    const response = await fetch(`/api/admin/machines/${machineId}`, {
+      method: 'DELETE'
+    })
+    
+    const data = await response.json()
+    
+    if (data.result) {
+      actionSuccess.value = 'Машинка удалена'
+      await loadAdminMachines()
+    } else {
+      actionError.value = data.message || 'Ошибка удаления'
+    }
+  } catch (err) {
+    actionError.value = 'Ошибка соединения'
+  } finally {
+    isLoading.value = false
+  }
+}
+
+// Обработчики расписаний
+const openScheduleForm = (schedule?: AdminSchedule) => {
+  if (schedule) {
+    editingScheduleId.value = schedule.id
+    scheduleForm.value = {
+      date: schedule.date,
+      isOpen: schedule.isOpen,
+      machineIds: [...schedule.machineIds],
+      timeSlots: [] // TODO: загрузить сохраненные слоты
+    }
+  } else {
+    editingScheduleId.value = null
+    const tomorrow = new Date()
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    scheduleForm.value = {
+      date: tomorrow.toISOString().split('T')[0] || '',
+      isOpen: true,
+      machineIds: [],
+      timeSlots: [...availableTimeSlots] // По умолчанию все слоты
+    }
+  }
+  showScheduleForm.value = true
+}
+
+const toggleMachineInSchedule = (machineId: string) => {
+  const idx = scheduleForm.value.machineIds.indexOf(machineId)
+  if (idx >= 0) {
+    scheduleForm.value.machineIds.splice(idx, 1)
+  } else {
+    scheduleForm.value.machineIds.push(machineId)
+  }
+}
+
+const toggleTimeSlotInSchedule = (timeSlot: string) => {
+  const idx = scheduleForm.value.timeSlots.indexOf(timeSlot)
+  if (idx >= 0) {
+    scheduleForm.value.timeSlots.splice(idx, 1)
+  } else {
+    scheduleForm.value.timeSlots.push(timeSlot)
+  }
+}
+
+const handleSaveSchedule = async () => {
+  if (!scheduleForm.value.date) {
+    actionError.value = 'Выберите дату'
+    return
+  }
+  
+  isLoading.value = true
+  actionError.value = null
+  actionSuccess.value = null
+  
+  try {
+    const response = await fetch('/api/admin/schedules', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(scheduleForm.value)
+    })
+    
+    if (response.ok) {
+      actionSuccess.value = editingScheduleId.value ? 'Расписание обновлено' : 'Расписание создано'
+      showScheduleForm.value = false
+      await loadSchedules()
+    } else {
+      actionError.value = 'Ошибка сохранения расписания'
+    }
+  } catch (err) {
+    actionError.value = 'Ошибка соединения'
+  } finally {
+    isLoading.value = false
+  }
+}
+
+const handleDeleteSchedule = async (scheduleId: string) => {
+  if (!confirm('Удалить это расписание?')) return
+  
+  isLoading.value = true
+  actionError.value = null
+  actionSuccess.value = null
+  
+  try {
+    const response = await fetch(`/api/admin/schedules/${scheduleId}`, {
+      method: 'DELETE'
+    })
+    
+    const data = await response.json()
+    
+    if (data.result) {
+      actionSuccess.value = 'Расписание удалено'
+      await loadSchedules()
+    } else {
+      actionError.value = data.message || 'Ошибка удаления'
+    }
+  } catch (err) {
+    actionError.value = 'Ошибка соединения'
+  } finally {
+    isLoading.value = false
+  }
+}
+
+// Получить название машинки по ID
+const getMachineName = (machineId: string) => {
+  const machine = adminMachines.value.find(m => m.id === machineId)
+  return machine?.name || machineId
 }
 
 const handleDeleteBooking = async (bookingId: string) => {
@@ -179,7 +403,7 @@ const handleDeleteBooking = async (bookingId: string) => {
   
   if (result.success) {
     actionSuccess.value = 'Запись отменена'
-    await loadSchedule()
+    await loadSchedules()
     await loadAllBookings()
   } else {
     actionError.value = result.message || 'Ошибка отмены'
@@ -187,15 +411,31 @@ const handleDeleteBooking = async (bookingId: string) => {
 }
 
 // Форматирование времени
+// Парсим напрямую чтобы избежать сдвига timezone
 const formatTime = (isoString: string) => {
   if (!isoString) return ''
+  // Если строка в формате "2025-12-17T10:00:00", парсим напрямую
+  const timePart = isoString.split('T')[1]
+  if (timePart) {
+    const [hours, minutes] = timePart.split(':')
+    return `${hours}:${minutes}`
+  }
+  // Fallback на Date если формат другой
   const date = new Date(isoString)
   return `${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`
 }
 
 // Форматирование даты
+// Парсим напрямую чтобы избежать сдвига timezone
 const formatDate = (isoString: string) => {
   if (!isoString) return ''
+  // Если строка в формате "2025-12-17T10:00:00", парсим напрямую
+  const datePart = isoString.split('T')[0]
+  if (datePart) {
+    const [year, month, day] = datePart.split('-')
+    return `${day}.${month}.${year}`
+  }
+  // Fallback на Date если формат другой
   const date = new Date(isoString)
   return date.toLocaleDateString('ru-RU')
 }
@@ -299,15 +539,23 @@ const handleUnblockUser = async (userId: string) => {
             :class="{ active: activeTab === 'machines' }"
             @click="activeTab = 'machines'"
           >
-            <WashingMachineOutlineIcon :size="20" :color="activeTab === 'machines' ? '#9CA3AF' : '#3D4F61'" />
+            <WashingMachineOutlineIcon :size="20" :color="activeTab === 'machines' ? '#fff' : '#3D4F61'" />
             Машинки
+          </button>
+          <button 
+            class="tab-btn" 
+            :class="{ active: activeTab === 'schedules' }"
+            @click="activeTab = 'schedules'"
+          >
+            <CalendarIcon :size="20" :color="activeTab === 'schedules' ? '#fff' : '#3D4F61'" />
+            Расписание
           </button>
           <button 
             class="tab-btn" 
             :class="{ active: activeTab === 'users' }"
             @click="activeTab = 'users'"
           >
-            <UserIcon :size="20" :color="activeTab === 'users' ? '#9CA3AF' : '#3D4F61'" />
+            <UserIcon :size="20" :color="activeTab === 'users' ? '#fff' : '#3D4F61'" />
             Пользователи
           </button>
           <button 
@@ -315,21 +563,43 @@ const handleUnblockUser = async (userId: string) => {
             :class="{ active: activeTab === 'bookings' }"
             @click="activeTab = 'bookings'"
           >
-            <CalendarIcon :size="20" :color="activeTab === 'bookings' ? '#9CA3AF' : '#3D4F61'" />
+            <EditIcon :size="20" :color="activeTab === 'bookings' ? '#fff' : '#3D4F61'" />
             Записи
           </button>
         </div>
 
         <!-- Machines Management -->
         <section v-if="!isLoading && activeTab === 'machines'" class="section">
-          <h2 class="section-title">УПРАВЛЕНИЕ МАШИНКАМИ</h2>
+          <div class="section-header">
+            <h2 class="section-title">УПРАВЛЕНИЕ МАШИНКАМИ</h2>
+            <button class="add-btn" @click="showAddMachineForm = true">
+              + Добавить машинку
+            </button>
+          </div>
+
+          <!-- Add Machine Form -->
+          <div v-if="showAddMachineForm" class="form-card">
+            <h3 class="form-title">Новая машинка</h3>
+            <div class="form-row">
+              <input 
+                v-model="newMachineName"
+                type="text"
+                placeholder="Название машинки"
+                class="form-input"
+              />
+            </div>
+            <div class="form-actions">
+              <button class="btn-secondary" @click="showAddMachineForm = false">Отмена</button>
+              <button class="btn-primary" @click="handleAddMachine">Добавить</button>
+            </div>
+          </div>
           
-          <div v-if="machines.length === 0" class="no-data">
-            Нет доступных машинок
+          <div v-if="adminMachines.length === 0" class="no-data">
+            Нет машинок
           </div>
 
           <div v-else class="machines-grid">
-            <div v-for="machine in machines" :key="machine.id" class="machine-card">
+            <div v-for="machine in adminMachines" :key="machine.id" class="machine-card">
               <div class="machine-icon">
                 <WashingMachineOutlineIcon :size="50" color="#3D4F61" />
               </div>
@@ -356,6 +626,133 @@ const handleUnblockUser = async (userId: string) => {
                   @click="handleUnblockMachine(machine.id)"
                 >
                   Разблокировать
+                </button>
+                <button 
+                  class="action-btn delete-btn"
+                  @click="handleDeleteMachine(machine.id)"
+                >
+                  <TrashIcon :size="16" color="white" />
+                  Удалить
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Schedules Management -->
+        <section v-if="!isLoading && activeTab === 'schedules'" class="section">
+          <div class="section-header">
+            <h2 class="section-title">УПРАВЛЕНИЕ РАСПИСАНИЕМ</h2>
+            <button class="add-btn" @click="openScheduleForm()">
+              + Добавить расписание
+            </button>
+          </div>
+
+          <!-- Schedule Form Modal -->
+          <div v-if="showScheduleForm" class="form-card">
+            <h3 class="form-title">{{ editingScheduleId ? 'Редактировать расписание' : 'Новое расписание' }}</h3>
+            <div class="form-row">
+              <label class="form-label">Дата:</label>
+              <input 
+                v-model="scheduleForm.date"
+                type="date"
+                class="form-input"
+              />
+            </div>
+            <div class="form-row checkbox-row">
+              <label class="checkbox-label">
+                <input 
+                  v-model="scheduleForm.isOpen"
+                  type="checkbox"
+                />
+                Записи разрешены
+              </label>
+            </div>
+            <div class="form-row">
+              <label class="form-label">Машинки для этой даты:</label>
+              <div class="machines-checkboxes">
+                <label 
+                  v-for="machine in adminMachines" 
+                  :key="machine.id"
+                  class="machine-checkbox"
+                >
+                  <input 
+                    type="checkbox"
+                    :checked="scheduleForm.machineIds.includes(machine.id)"
+                    @change="toggleMachineInSchedule(machine.id)"
+                  />
+                  {{ machine.name }}
+                </label>
+              </div>
+            </div>
+            <div class="form-row">
+              <label class="form-label">Доступное время для записи:</label>
+              <div class="timeslots-checkboxes">
+                <label 
+                  v-for="timeSlot in availableTimeSlots" 
+                  :key="timeSlot"
+                  class="timeslot-checkbox"
+                >
+                  <input 
+                    type="checkbox"
+                    :checked="scheduleForm.timeSlots.includes(timeSlot)"
+                    @change="toggleTimeSlotInSchedule(timeSlot)"
+                  />
+                  {{ timeSlot }}
+                </label>
+              </div>
+            </div>
+            <div class="form-actions">
+              <button class="btn-secondary" @click="showScheduleForm = false">Отмена</button>
+              <button class="btn-primary" @click="handleSaveSchedule">Сохранить</button>
+            </div>
+          </div>
+
+          <div v-if="schedules.length === 0" class="no-data">
+            Нет настроенных расписаний. По умолчанию все дни открыты для записи.
+          </div>
+
+          <div v-else class="schedules-list">
+            <div v-for="schedule in schedules" :key="schedule.id" class="schedule-card">
+              <div class="schedule-icon">
+                <CalendarIcon :size="40" color="#3D4F61" />
+              </div>
+              <div class="schedule-info">
+                <h3 class="schedule-date">{{ formatDate(schedule.date) }}</h3>
+                <span 
+                  class="schedule-status"
+                  :class="{ open: schedule.isOpen, closed: !schedule.isOpen }"
+                >
+                  {{ schedule.isOpen ? 'Записи открыты' : 'Записи закрыты' }}
+                </span>
+                <div class="schedule-machines" v-if="schedule.machineIds.length > 0">
+                  <span class="schedule-machines-label">Машинки:</span>
+                  <span 
+                    v-for="machineId in schedule.machineIds" 
+                    :key="machineId"
+                    class="schedule-machine-tag"
+                  >
+                    {{ getMachineName(machineId) }}
+                  </span>
+                </div>
+                <div v-else class="schedule-machines">
+                  <span class="schedule-machines-label">Все машинки недоступны</span>
+                </div>
+              </div>
+              <div class="schedule-actions">
+                <button 
+                  class="action-btn edit-btn"
+                  @click="openScheduleForm(schedule)"
+                >
+                  <EditIcon :size="16" color="white" />
+                  Изменить
+                </button>
+                <button 
+                  class="action-btn delete-btn"
+                  @click="handleDeleteSchedule(schedule.id)"
+                >
+                  <TrashIcon :size="16" color="white" />
+                  Удалить
                 </button>
               </div>
             </div>
@@ -880,5 +1277,299 @@ const handleUnblockUser = async (userId: string) => {
 .booking-actions {
   display: flex;
   gap: 10px;
+}
+
+/* Section Header */
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.section-header .section-title {
+  margin-bottom: 0;
+}
+
+.add-btn {
+  padding: 10px 20px;
+  background: #3B82F6;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.add-btn:hover {
+  background: #2563EB;
+}
+
+/* Form Card */
+.form-card {
+  background: #FFFFFF;
+  border-radius: 16px;
+  padding: 25px;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.06);
+}
+
+.form-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #3D4F61;
+  margin: 0 0 20px 0;
+}
+
+.form-row {
+  margin-bottom: 15px;
+}
+
+.form-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: #6B7280;
+  margin-bottom: 8px;
+}
+
+.form-input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid #E5E7EB;
+  border-radius: 8px;
+  font-size: 16px;
+  transition: border-color 0.3s ease;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: #3B82F6;
+}
+
+.checkbox-row {
+  margin-top: 10px;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 16px;
+  color: #3D4F61;
+  cursor: pointer;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.machines-checkboxes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+.machine-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 15px;
+  background: #F3F4F6;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.machine-checkbox:hover {
+  background: #E5E7EB;
+}
+
+.machine-checkbox input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.timeslots-checkboxes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.timeslot-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #EFF6FF;
+  border: 1px solid #BFDBFE;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 14px;
+  color: #1E40AF;
+}
+
+.timeslot-checkbox:hover {
+  background: #DBEAFE;
+  border-color: #93C5FD;
+}
+
+.timeslot-checkbox input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+}
+
+.form-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.btn-primary {
+  padding: 12px 24px;
+  background: #3B82F6;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-primary:hover {
+  background: #2563EB;
+}
+
+.btn-secondary {
+  padding: 12px 24px;
+  background: #E5E7EB;
+  color: #6B7280;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-secondary:hover {
+  background: #D1D5DB;
+}
+
+/* Delete Button */
+.delete-btn {
+  background: #DC2626;
+  color: white;
+}
+
+.delete-btn:hover {
+  background: #B91C1C;
+}
+
+/* Edit Button */
+.edit-btn {
+  background: #3B82F6;
+  color: white;
+}
+
+.edit-btn:hover {
+  background: #2563EB;
+}
+
+/* Schedules */
+.schedules-list {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.schedule-card {
+  background: #FFFFFF;
+  border-radius: 16px;
+  padding: 20px 25px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.06);
+}
+
+.schedule-icon {
+  flex-shrink: 0;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: #E8EEF2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.schedule-info {
+  flex: 1;
+}
+
+.schedule-date {
+  font-size: 18px;
+  font-weight: 600;
+  color: #3D4F61;
+  margin: 0 0 8px 0;
+}
+
+.schedule-status {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.schedule-status.open {
+  background: rgba(34, 197, 94, 0.1);
+  color: #22C55E;
+}
+
+.schedule-status.closed {
+  background: rgba(239, 68, 68, 0.1);
+  color: #EF4444;
+}
+
+.schedule-machines {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.schedule-machines-label {
+  font-size: 14px;
+  color: #6B7280;
+}
+
+.schedule-machine-tag {
+  display: inline-block;
+  padding: 4px 10px;
+  background: #E8EEF2;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #3D4F61;
+}
+
+.schedule-actions {
+  display: flex;
+  gap: 10px;
+}
+
+/* Machine actions flex direction */
+.machine-actions {
+  flex-direction: column;
 }
 </style>

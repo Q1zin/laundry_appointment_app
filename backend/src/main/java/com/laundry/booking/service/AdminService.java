@@ -2,13 +2,17 @@ package com.laundry.booking.service;
 
 import com.laundry.booking.dto.AdminBookingDto;
 import com.laundry.booking.dto.BookingResult;
+import com.laundry.booking.dto.ScheduleDto;
+import com.laundry.booking.dto.ScheduleRequest;
 import com.laundry.booking.entity.Booking;
 import com.laundry.booking.entity.Machine;
 import com.laundry.booking.entity.Schedule;
+import com.laundry.booking.entity.ScheduleMachine;
 import com.laundry.booking.entity.Timeslot;
 import com.laundry.booking.entity.User;
 import com.laundry.booking.repository.BookingRepository;
 import com.laundry.booking.repository.MachineRepository;
+import com.laundry.booking.repository.ScheduleMachineRepository;
 import com.laundry.booking.repository.ScheduleRepository;
 import com.laundry.booking.repository.TimeslotRepository;
 import com.laundry.booking.repository.UserRepository;
@@ -17,8 +21,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -26,18 +33,49 @@ public class AdminService {
 
     private final MachineRepository machineRepository;
     private final ScheduleRepository scheduleRepository;
+    private final ScheduleMachineRepository scheduleMachineRepository;
     private final BookingRepository bookingRepository;
     private final TimeslotRepository timeslotRepository;
     private final UserRepository userRepository;
 
+    // ============= MACHINES =============
+
     /**
-     * Admin Controller - blockMachine method
-     * Последовательность вызовов:
-     * 1. Найти машину
-     * 2. Проверить, не заблокирована ли уже
-     * 3. Установить статус "blocked"
-     * 4. Вернуть результат
+     * Получить все машинки
      */
+    public List<Machine> getAllMachines() {
+        return machineRepository.findAll();
+    }
+
+    /**
+     * Создать новую машинку
+     */
+    @Transactional
+    public Machine createMachine(String name) {
+        Machine machine = new Machine();
+        machine.setName(name);
+        machine.setStatus("available");
+        return machineRepository.save(machine);
+    }
+
+    /**
+     * Удалить машинку
+     */
+    @Transactional
+    public BookingResult deleteMachine(String machineId) {
+        Machine machine = machineRepository.findById(machineId).orElse(null);
+        if (machine == null) {
+            return new BookingResult(false, "Machine not found");
+        }
+
+        // Удаляем связи с расписаниями
+        scheduleMachineRepository.deleteByMachineId(machineId);
+        
+        // Удаляем машинку (каскадно удалятся timeslots и bookings)
+        machineRepository.delete(machine);
+
+        return new BookingResult(true, "Machine deleted successfully");
+    }
     @Transactional
     public BookingResult blockMachine(String machineId) {
         // Шаг 1: Найти машину
@@ -80,82 +118,167 @@ public class AdminService {
         return new BookingResult(true, "Machine unblocked successfully");
     }
 
+    // ============= SCHEDULES =============
+
     /**
-     * Admin Controller - openBooking method
-     * Последовательность вызовов:
-     * 1. Найти или создать расписание
-     * 2. Открыть для бронирования
-     * 3. Пометить слоты как доступные
-     * 4. Вернуть результат
+     * Получить все расписания
      */
-    @Transactional
-    public BookingResult openBooking(LocalDate date) {
-        // Шаг 1: Найти или создать расписание
-        Schedule schedule = scheduleRepository.findByDate(date)
-                .orElseGet(() -> {
-                    Schedule newSchedule = new Schedule();
-                    newSchedule.setDate(date);
-                    newSchedule.setIsOpen(false);
-                    return scheduleRepository.save(newSchedule);
-                });
+    public List<ScheduleDto> getAllSchedules() {
+        List<Schedule> schedules = scheduleRepository.findAll();
+        List<ScheduleDto> result = new ArrayList<>();
 
-        // Шаг 2: Открыть для бронирования
-        schedule.setIsOpen(true);
-        scheduleRepository.save(schedule);
+        for (Schedule schedule : schedules) {
+            ScheduleDto dto = new ScheduleDto();
+            dto.setId(schedule.getId());
+            dto.setDate(schedule.getDate());
+            dto.setIsOpen(schedule.getIsOpen());
+            dto.setCreatedAt(schedule.getCreatedAt());
 
-        // Шаг 3: Пометить слоты как доступные
-        List<Timeslot> slots = timeslotRepository.findByDate(date);
-        for (Timeslot slot : slots) {
-            slot.markAvailable();
-            timeslotRepository.save(slot);
+            // Получаем машинки для этого расписания
+            List<ScheduleMachine> scheduleMachines = scheduleMachineRepository.findByScheduleId(schedule.getId());
+            List<String> machineIds = scheduleMachines.stream()
+                    .map(ScheduleMachine::getMachineId)
+                    .collect(Collectors.toList());
+            dto.setMachineIds(machineIds);
+
+            result.add(dto);
         }
 
-        return new BookingResult(true, "Booking opened successfully");
+        return result;
     }
 
     /**
-     * Admin Controller - closeBooking method
-     * Последовательность вызовов:
-     * 1. Найти расписание
-     * 2. Проверить, открыто ли
-     * 3. Закрыть для бронирования
-     * 4. Пометить слоты как недоступные
-     * 5. Вернуть результат
+     * Создать или обновить расписание
      */
     @Transactional
-    public BookingResult closeBooking(LocalDate date) {
-        // Шаг 1: Найти расписание
-        Schedule schedule = scheduleRepository.findByDate(date).orElse(null);
+    public ScheduleDto createOrUpdateSchedule(ScheduleRequest request) {
+        // Найти или создать расписание
+        Schedule schedule = scheduleRepository.findByDate(request.getDate())
+                .orElseGet(() -> {
+                    Schedule newSchedule = new Schedule();
+                    newSchedule.setDate(request.getDate());
+                    return newSchedule;
+                });
+
+        schedule.setIsOpen(request.getIsOpen());
+        schedule = scheduleRepository.save(schedule);
+
+        // Удаляем старые связи с машинками
+        scheduleMachineRepository.deleteByScheduleId(schedule.getId());
+
+        // Создаём новые связи
+        if (request.getMachineIds() != null) {
+            for (String machineId : request.getMachineIds()) {
+                ScheduleMachine sm = new ScheduleMachine();
+                sm.setScheduleId(schedule.getId());
+                sm.setMachineId(machineId);
+                scheduleMachineRepository.save(sm);
+            }
+        }
+
+        // Создаём или обновляем временные слоты для выбранных машинок и времени
+        if (request.getIsOpen() && request.getMachineIds() != null && !request.getMachineIds().isEmpty()) {
+            // Если временные слоты указаны, используем их, иначе - все по умолчанию
+            if (request.getTimeSlots() != null && !request.getTimeSlots().isEmpty()) {
+                createTimeslotsForDate(request.getDate(), request.getMachineIds(), request.getTimeSlots());
+            } else {
+                createTimeslotsForDate(request.getDate(), request.getMachineIds(), null);
+            }
+        }
+
+        // Возвращаем DTO
+        ScheduleDto dto = new ScheduleDto();
+        dto.setId(schedule.getId());
+        dto.setDate(schedule.getDate());
+        dto.setIsOpen(schedule.getIsOpen());
+        dto.setMachineIds(request.getMachineIds());
+        dto.setCreatedAt(schedule.getCreatedAt());
+
+        return dto;
+    }
+
+    /**
+     * Создать временные слоты для даты и машинок
+     * @param date дата
+     * @param machineIds список ID машинок
+     * @param timeSlots список временных слотов в формате "HH:mm-HH:mm" или null для всех слотов по умолчанию
+     */
+    private void createTimeslotsForDate(LocalDate date, List<String> machineIds, List<String> timeSlots) {
+        // Сначала удаляем существующие слоты для этой даты и этих машинок
+        for (String machineId : machineIds) {
+            List<Timeslot> existingSlots = timeslotRepository.findByMachineIdAndDate(machineId, date);
+            timeslotRepository.deleteAll(existingSlots);
+        }
+
+        // Если временные слоты не указаны, создаем все по умолчанию
+        if (timeSlots == null || timeSlots.isEmpty()) {
+            int[][] defaultSlots = {{8, 10}, {10, 12}, {12, 14}, {14, 16}, {16, 18}, {18, 20}, {20, 22}};
+            for (String machineId : machineIds) {
+                for (int[] slot : defaultSlots) {
+                    LocalDateTime startTime = LocalDateTime.of(date, LocalTime.of(slot[0], 0));
+                    LocalDateTime endTime = LocalDateTime.of(date, LocalTime.of(slot[1], 0));
+                    
+                    Timeslot timeslot = new Timeslot();
+                    timeslot.setMachineId(machineId);
+                    timeslot.setStartTime(startTime);
+                    timeslot.setEndTime(endTime);
+                    timeslot.setIsAvailable(true);
+                    timeslotRepository.save(timeslot);
+                }
+            }
+        } else {
+            // Создаем только выбранные слоты
+            for (String machineId : machineIds) {
+                for (String timeSlot : timeSlots) {
+                    // Парсим формат "08:00-10:00"
+                    String[] parts = timeSlot.split("-");
+                    if (parts.length == 2) {
+                        String[] startParts = parts[0].split(":");
+                        String[] endParts = parts[1].split(":");
+                        
+                        int startHour = Integer.parseInt(startParts[0]);
+                        int startMinute = Integer.parseInt(startParts[1]);
+                        int endHour = Integer.parseInt(endParts[0]);
+                        int endMinute = Integer.parseInt(endParts[1]);
+                        
+                        LocalDateTime startTime = LocalDateTime.of(date, LocalTime.of(startHour, startMinute));
+                        LocalDateTime endTime = LocalDateTime.of(date, LocalTime.of(endHour, endMinute));
+                        
+                        Timeslot timeslot = new Timeslot();
+                        timeslot.setMachineId(machineId);
+                        timeslot.setStartTime(startTime);
+                        timeslot.setEndTime(endTime);
+                        timeslot.setIsAvailable(true);
+                        timeslotRepository.save(timeslot);
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Удалить расписание
+     */
+    @Transactional
+    public BookingResult deleteSchedule(String scheduleId) {
+        Schedule schedule = scheduleRepository.findById(scheduleId).orElse(null);
         if (schedule == null) {
             return new BookingResult(false, "Schedule not found");
         }
 
-        // Шаг 2: Проверить, открыто ли
-        if (!schedule.isOpen()) {
-            return new BookingResult(false, "Schedule is already closed");
-        }
+        // Удаляем связи с машинками
+        scheduleMachineRepository.deleteByScheduleId(scheduleId);
 
-        // Шаг 3: Закрыть для бронирования
-        schedule.setIsOpen(false);
-        scheduleRepository.save(schedule);
+        // Удаляем расписание
+        scheduleRepository.delete(schedule);
 
-        // Шаг 4: Пометить слоты как недоступные
-        List<Timeslot> slots = timeslotRepository.findByDate(date);
-        for (Timeslot slot : slots) {
-            slot.markUnavailable();
-            timeslotRepository.save(slot);
-        }
-
-        return new BookingResult(true, "Booking closed successfully");
+        return new BookingResult(true, "Schedule deleted successfully");
     }
 
+    // ============= BOOKINGS =============
+
     /**
-     * Admin Controller - deleteBooking method
-     * Последовательность вызовов:
-     * 1. Найти бронирование
-     * 2. Установить состояние "deleted"
-     * 3. Освободить слот
-     * 4. Вернуть результат
+     * Удалить бронирование
      */
     @Transactional
     public BookingResult deleteBooking(String bookingId) {

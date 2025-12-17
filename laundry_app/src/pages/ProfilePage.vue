@@ -56,7 +56,15 @@ const getMachineName = (machineId: string) => {
 }
 
 // Форматирование времени из ISO в HH:MM
+// Парсим напрямую чтобы избежать сдвига timezone
 const formatTime = (isoString: string) => {
+  // Если строка в формате "2025-12-17T10:00:00", парсим напрямую
+  const timePart = isoString.split('T')[1]
+  if (timePart) {
+    const [hours, minutes] = timePart.split(':')
+    return `${hours}:${minutes}`
+  }
+  // Fallback на Date если формат другой
   const date = new Date(isoString)
   const hours = date.getHours()
   const minutes = date.getMinutes()
