@@ -33,6 +33,9 @@ const machines = ref<Machine[]>([])
 const timeslots = ref<Timeslot[]>([])
 const bookings = ref<Booking[]>([])
 
+// Расписания для всех дат (для фильтрации доступных дат по машинке)
+const schedulesMap = ref<Map<string, { timeslots: Timeslot[], bookings: Booking[] }>>(new Map())
+
 // Генерация дат на 7 дней вперед
 interface DateOption {
   date: string // YYYY-MM-DD
@@ -40,7 +43,8 @@ interface DateOption {
   dayNum: number // 1, 2, 3...
 }
 
-const availableDates = computed<DateOption[]>(() => {
+// Все даты на 7 дней вперед
+const allDates = computed<DateOption[]>(() => {
   const dates: DateOption[] = []
   const dayNames = ['ВС', 'ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ']
   
@@ -56,6 +60,53 @@ const availableDates = computed<DateOption[]>(() => {
   }
   
   return dates
+})
+
+// Доступные даты для выбранной машинки (только те, где есть свободные слоты)
+const availableDates = computed<DateOption[]>(() => {
+  if (!selectedMachineId.value) return allDates.value
+  
+  return allDates.value.filter(dateOption => {
+    const schedule = schedulesMap.value.get(dateOption.date)
+    if (!schedule) return false
+    
+    // Получаем занятые слоты для выбранной машинки
+    const occupiedSlotIds = schedule.bookings
+      .filter(b => b.machineId === selectedMachineId.value && b.state === 'active')
+      .map(b => b.slotId)
+    
+    // Проверяем есть ли хотя бы один свободный слот для этой машинки
+    const hasFreeSlots = schedule.timeslots.some(
+      slot => slot.machineId === selectedMachineId.value && 
+              !occupiedSlotIds.includes(slot.slotId)
+    )
+    
+    return hasFreeSlots
+  })
+})
+
+// Загрузка расписаний для всех дат при выборе машинки
+watch(selectedMachineId, async (newMachineId) => {
+  if (!newMachineId || !user.value?.id) return
+  
+  // Загружаем расписания для всех 7 дней
+  schedulesMap.value.clear()
+  
+  const promises = allDates.value.map(async (dateOption) => {
+    const result = await fetchSchedule(dateOption.date, String(user.value!.id))
+    if (result.success && result.data) {
+      schedulesMap.value.set(dateOption.date, {
+        timeslots: result.data.timeslots,
+        bookings: result.data.bookings || []
+      })
+    }
+  })
+  
+  await Promise.all(promises)
+  
+  // Сбрасываем выбор даты и слота
+  selectedDate.value = ''
+  selectedSlotId.value = null
 })
 
 // Загрузка расписания при смене даты
@@ -81,20 +132,19 @@ watch(selectedDate, async (newDate) => {
 // Инициализация при открытии
 watch(() => props.isOpen, async (isOpen) => {
   if (isOpen) {
-    // Устанавливаем сегодняшнюю дату
-    const today = new Date()
-    selectedDate.value = today.toISOString().split('T')[0]!
-    
-    // Сбрасываем выбор
+    // Сбрасываем все выборы
     selectedMachineId.value = null
+    selectedDate.value = ''
     selectedSlotId.value = null
     bookingSuccess.value = false
     bookingError.value = null
+    schedulesMap.value.clear()
     
-    // Загружаем начальные данные машинок
+    // Загружаем начальные данные машинок (для текущей даты)
     if (user.value?.id) {
       isLoading.value = true
-      const result = await fetchSchedule(selectedDate.value, String(user.value.id))
+      const today = new Date().toISOString().split('T')[0]!
+      const result = await fetchSchedule(today, String(user.value.id))
       
       if (result.success && result.data) {
         machines.value = result.data.machines
