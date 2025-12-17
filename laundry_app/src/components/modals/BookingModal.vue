@@ -1,11 +1,9 @@
 <script setup lang="ts">
-import { ref, computed, toRef, watch, onMounted } from 'vue'
+import { ref, computed, toRef, watch } from 'vue'
 import WashingMachineOutlineIcon from '@/components/icons/WashingMachineOutlineIcon.vue'
-import UserIcon from '@/components/icons/UserIcon.vue'
-import KeyIcon from '@/components/icons/KeyIcon.vue'
 import { useAuth } from '@/composables/useAuth'
 import { useBookings } from '@/composables/useBookings'
-import { useSchedule, type Machine, type Timeslot } from '@/composables/useSchedule'
+import { useSchedule, type Machine, type Timeslot, type Booking } from '@/composables/useSchedule'
 import { useBodyScrollLock } from '@/composables/useBodyScrollLock'
 
 const props = defineProps<{
@@ -33,32 +31,59 @@ const bookingSuccess = ref(false)
 // Schedule data
 const machines = ref<Machine[]>([])
 const timeslots = ref<Timeslot[]>([])
+const bookings = ref<Booking[]>([])
 
-// Загрузка расписания при открытии модалки
-const loadSchedule = async () => {
-  if (!user.value?.id || !selectedDate.value) return
+// Генерация дат на 7 дней вперед
+interface DateOption {
+  date: string // YYYY-MM-DD
+  dayName: string // ПН, ВТ, СР...
+  dayNum: number // 1, 2, 3...
+}
+
+const availableDates = computed<DateOption[]>(() => {
+  const dates: DateOption[] = []
+  const dayNames = ['ВС', 'ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ']
+  
+  for (let i = 0; i < 7; i++) {
+    const date = new Date()
+    date.setDate(date.getDate() + i)
+    
+    dates.push({
+      date: date.toISOString().split('T')[0]!,
+      dayName: dayNames[date.getDay()]!,
+      dayNum: date.getDate()
+    })
+  }
+  
+  return dates
+})
+
+// Загрузка расписания при смене даты
+watch(selectedDate, async (newDate) => {
+  if (!newDate || !user.value?.id) return
   
   isLoading.value = true
   bookingError.value = null
   
-  const result = await fetchSchedule(selectedDate.value, String(user.value.id))
+  const result = await fetchSchedule(newDate, String(user.value.id))
   
   if (result.success && result.data) {
     machines.value = result.data.machines
     timeslots.value = result.data.timeslots
+    bookings.value = result.data.bookings || []
   } else {
     bookingError.value = result.error || 'Не удалось загрузить расписание'
   }
   
   isLoading.value = false
-}
+})
 
 // Инициализация при открытии
 watch(() => props.isOpen, async (isOpen) => {
   if (isOpen) {
     // Устанавливаем сегодняшнюю дату
     const today = new Date()
-    selectedDate.value = today.toISOString().split('T')[0] || ''
+    selectedDate.value = today.toISOString().split('T')[0]!
     
     // Сбрасываем выбор
     selectedMachineId.value = null
@@ -66,8 +91,18 @@ watch(() => props.isOpen, async (isOpen) => {
     bookingSuccess.value = false
     bookingError.value = null
     
-    // Загружаем расписание
-    await loadSchedule()
+    // Загружаем начальные данные машинок
+    if (user.value?.id) {
+      isLoading.value = true
+      const result = await fetchSchedule(selectedDate.value, String(user.value.id))
+      
+      if (result.success && result.data) {
+        machines.value = result.data.machines
+        timeslots.value = result.data.timeslots
+        bookings.value = result.data.bookings || []
+      }
+      isLoading.value = false
+    }
   }
 }, { immediate: true })
 
@@ -76,18 +111,33 @@ const availableMachines = computed(() => {
   return machines.value.filter(m => m.status === 'available' || !m.alreadyBlocked)
 })
 
-// Доступные слоты для выбранной машинки
+// Доступные слоты для выбранной машинки и даты
 const availableSlots = computed(() => {
-  if (!selectedMachineId.value) return []
+  if (!selectedMachineId.value || !selectedDate.value) return []
   
+  // Получаем занятые слоты для выбранной машинки
+  const occupiedSlotIds = bookings.value
+    .filter(b => b.machineId === selectedMachineId.value && b.state === 'active')
+    .map(b => b.slotId)
+  
+  // Фильтруем слоты: только для выбранной машинки и не занятые
   return timeslots.value.filter(
-    slot => slot.machineId === selectedMachineId.value && slot.isAvailable
+    slot => slot.machineId === selectedMachineId.value && 
+            !occupiedSlotIds.includes(slot.slotId)
   )
 })
 
+// Форматирование времени из ISO в HH:MM
+const formatTime = (isoString: string) => {
+  const date = new Date(isoString)
+  const hours = date.getHours()
+  const minutes = date.getMinutes()
+  return `${hours}:${minutes.toString().padStart(2, '0')}`
+}
+
 // Форматирование времени слота
 const formatSlotTime = (slot: Timeslot) => {
-  return `${slot.startTime} - ${slot.endTime}`
+  return `${formatTime(slot.startTime)} - ${formatTime(slot.endTime)}`
 }
 
 const closeModal = () => {
@@ -178,36 +228,45 @@ const handleSubmit = async () => {
                   :class="{ active: selectedMachineId === machine.id }"
                   @click="selectedMachineId = machine.id; selectedSlotId = null"
                 >
-                  <WashingMachineOutlineIcon :size="50" />
-                  <span class="machine-name">{{ machine.name }}</span>
+                  <WashingMachineOutlineIcon :size="80" color="#3D4F61" />
+                  <span class="machine-name">{{ machine.name.toUpperCase() }}</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Date Selection -->
+            <div v-if="selectedMachineId" class="section">
+              <h3 class="section-title">ВЫБЕРИТЕ ДАТУ</h3>
+              <div class="dates-grid">
+                <button
+                  v-for="dateOption in availableDates"
+                  :key="dateOption.date"
+                  class="date-btn"
+                  :class="{ active: selectedDate === dateOption.date }"
+                  @click="selectedDate = dateOption.date; selectedSlotId = null"
+                >
+                  <div class="date-day">{{ dateOption.dayName }}</div>
+                  <div class="date-num">{{ dateOption.dayNum }}</div>
                 </button>
               </div>
             </div>
 
             <!-- Time Slot Selection -->
-            <div v-if="selectedMachineId" class="section">
+            <div v-if="selectedMachineId && selectedDate" class="section">
               <h3 class="section-title">ВЫБЕРИТЕ ВРЕМЯ</h3>
               <div v-if="availableSlots.length === 0" class="no-data">
-                Нет доступных слотов для этой машинки
+                Нет доступных слотов на эту дату
               </div>
               <div v-else class="times-grid">
                 <button
                   v-for="slot in availableSlots"
-                  :key="slot.id"
+                  :key="slot.slotId"
                   class="time-btn"
-                  :class="{ active: selectedSlotId === slot.id }"
-                  @click="selectedSlotId = slot.id"
+                  :class="{ active: selectedSlotId === slot.slotId }"
+                  @click="selectedSlotId = slot.slotId"
                 >
                   {{ formatSlotTime(slot) }}
                 </button>
-              </div>
-            </div>
-
-            <!-- User Info -->
-            <div class="section inputs-section">
-              <div class="info-row">
-                <UserIcon :size="24" class="input-icon" />
-                <span class="info-text">Пользователь: {{ user?.name || 'Не указан' }}</span>
               </div>
             </div>
 
@@ -295,32 +354,35 @@ const handleSubmit = async () => {
 }
 
 .section-title {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: bold;
   color: #3D4F61;
-  margin-bottom: 15px;
+  margin-bottom: 25px;
+  margin-top: 20px;
 }
 
 /* Machines */
 .machines-grid {
   display: flex;
-  gap: 20px;
+  gap: 25px;
   justify-content: center;
+  flex-wrap: wrap;
 }
 
 .machine-card {
-  width: 130px;
-  height: 130px;
-  border-radius: 15px;
+  width: 180px;
+  height: 180px;
+  border-radius: 20px;
   border: 2px solid #E8EEF2;
   background: #FFFFFF;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 15px;
   cursor: pointer;
   transition: all 0.3s ease;
-  color: #3D4F61;
+  padding: 30px 40px;
 }
 
 .machine-card:hover {
@@ -331,41 +393,32 @@ const handleSubmit = async () => {
   border: 3px solid #6B8DB8;
 }
 
-.machine-card.disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-  background: #F0F0F0;
-}
-
-.machine-card.disabled:hover {
-  border-color: #E8EEF2;
-}
-
 .machine-name {
-  font-size: 14px;
-  font-weight: 600;
-  margin-top: 10px;
+  font-size: 16px;
+  font-weight: 500;
   color: #3D4F61;
+  text-align: center;
 }
 
 /* Dates */
 .dates-grid {
   display: flex;
-  gap: 8px;
+  gap: 12px;
   justify-content: center;
   flex-wrap: wrap;
 }
 
 .date-btn {
-  width: 65px;
-  height: 65px;
-  border-radius: 12px;
+  width: 80px;
+  height: 80px;
+  border-radius: 15px;
   border: 2px solid #E8EEF2;
   background: #FFFFFF;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 4px;
   cursor: pointer;
   transition: all 0.3s ease;
 }
@@ -380,39 +433,40 @@ const handleSubmit = async () => {
   border-color: #6B8DB8;
 }
 
-.day-name {
-  font-size: 12px;
+.date-day {
+  font-size: 16px;
   color: #3D4F61;
 }
 
-.day-number {
-  font-size: 16px;
+.date-num {
+  font-size: 20px;
   font-weight: bold;
   color: #3D4F61;
 }
 
-.date-btn.active .day-name,
-.date-btn.active .day-number {
+.date-btn.active .date-day,
+.date-btn.active .date-num {
   color: #FFFFFF;
 }
 
 /* Times */
 .times-grid {
   display: flex;
-  gap: 12px;
+  gap: 20px;
   justify-content: center;
   flex-wrap: wrap;
 }
 
 .time-btn {
-  padding: 10px 20px;
-  border-radius: 20px;
+  padding: 15px 35px;
+  border-radius: 25px;
   border: 2px solid #E8EEF2;
   background: #FFFFFF;
-  font-size: 14px;
+  font-size: 16px;
   color: #3D4F61;
   cursor: pointer;
   transition: all 0.3s ease;
+  white-space: nowrap;
 }
 
 .time-btn:hover {
@@ -424,17 +478,6 @@ const handleSubmit = async () => {
   background: #6B8DB8;
   border-color: #6B8DB8;
   color: #FFFFFF;
-}
-
-.time-btn.disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-  background: #F0F0F0;
-}
-
-.time-btn.disabled:hover {
-  border-color: #E8EEF2;
-  background: #F0F0F0;
 }
 
 /* Input Fields */

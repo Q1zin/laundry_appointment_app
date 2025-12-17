@@ -55,10 +55,18 @@ const getMachineName = (machineId: string) => {
   return machine?.name || `Машинка #${machineId}`
 }
 
+// Форматирование времени из ISO в HH:MM
+const formatTime = (isoString: string) => {
+  const date = new Date(isoString)
+  const hours = date.getHours()
+  const minutes = date.getMinutes()
+  return `${hours}:${minutes.toString().padStart(2, '0')}`
+}
+
 // Получаем данные слота по ID
 const getSlotTime = (slotId: string) => {
   const slot = timeslots.value.find(s => s.slotId === slotId)
-  return slot ? `${slot.startTime} - ${slot.endTime}` : `Слот #${slotId}`
+  return slot ? `${formatTime(slot.startTime)} - ${formatTime(slot.endTime)}` : `Слот #${slotId}`
 }
 
 // Редирект если не авторизован + загрузка записей
