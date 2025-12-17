@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import TheHeader from '@/components/layout/TheHeader.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -9,41 +9,101 @@ import CalendarIcon from '@/components/icons/CalendarIcon.vue'
 import TrashIcon from '@/components/icons/TrashIcon.vue'
 import EditIcon from '@/components/icons/EditIcon.vue'
 import { useAuth } from '@/composables/useAuth'
-import { useBookings, type Booking } from '@/composables/useBookings'
+import { useSchedule, type Booking as ScheduleBooking, type Machine, type Timeslot } from '@/composables/useSchedule'
 
 const router = useRouter()
 const { isLoggedIn, user, logout } = useAuth()
-const { activeBookings, cancelBooking } = useBookings()
+const { fetchSchedule } = useSchedule()
 
 const isBookingModalOpen = ref(false)
-const editingBooking = ref<Booking | null>(null)
 const isLoading = ref(false)
 const error = ref<string | null>(null)
+const bookings = ref<ScheduleBooking[]>([])
+const machines = ref<Machine[]>([])
+const timeslots = ref<Timeslot[]>([])
 
-// Редирект если не авторизован
-onMounted(() => {
+// Загрузка расписания и записей
+const loadUserBookings = async () => {
+  if (!user.value?.id) return
+  
+  isLoading.value = true
+  error.value = null
+  
+  const today = new Date().toISOString().split('T')[0] || ''
+  const result = await fetchSchedule(today, String(user.value.id))
+  
+  if (result.success && result.data) {
+    machines.value = result.data.machines
+    timeslots.value = result.data.timeslots
+    bookings.value = result.data.bookings
+  } else {
+    error.value = result.error || 'Не удалось загрузить записи'
+  }
+  
+  isLoading.value = false
+}
+
+// Фильтруем только записи текущего пользователя
+const userBookings = computed(() => {
+  if (!user.value?.id) return []
+  return bookings.value.filter(b => b.userId === user.value.id && b.state === 'active')
+})
+
+// Получаем данные машинки по ID
+const getMachineName = (machineId: string) => {
+  const machine = machines.value.find(m => m.id === machineId)
+  return machine?.name || `Машинка #${machineId}`
+}
+
+// Получаем данные слота по ID
+const getSlotTime = (slotId: string) => {
+  const slot = timeslots.value.find(s => s.slotId === slotId)
+  return slot ? `${slot.startTime} - ${slot.endTime}` : `Слот #${slotId}`
+}
+
+// Редирект если не авторизован + загрузка записей
+onMounted(async () => {
   if (!isLoggedIn.value) {
     router.push('/')
+    return
   }
+  await loadUserBookings()
 })
 
 const handleCancelBooking = async (bookingId: string) => {
   if (!user.value?.id) return
   
-  if (confirm('Вы уверены, что хотите отменить эту запись?')) {
-    isLoading.value = true
-    error.value = null
+  if (!confirm('Вы уверены, что хотите отменить эту запись?')) return
+  
+  isLoading.value = true
+  error.value = null
+  
+  try {
+    const response = await fetch('/api/bookings/cancel', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ 
+        bookingId: bookingId,
+        userId: user.value.id 
+      })
+    })
     
-    const result = await cancelBooking(bookingId, String(user.value.id))
+    const data = await response.json()
     
-    isLoading.value = false
-    
-    if (result.success) {
+    if (data.result) {
       alert('Запись успешно отменена')
+      await loadUserBookings() // Перезагружаем список
     } else {
-      error.value = result.message || 'Ошибка при отмене записи'
+      error.value = data.message || 'Ошибка при отмене записи'
       alert(error.value)
     }
+  } catch (err) {
+    error.value = 'Ошибка соединения с сервером'
+    alert(error.value)
+  } finally {
+    isLoading.value = false
   }
 }
 
@@ -53,18 +113,12 @@ const handleLogout = () => {
 }
 
 const openBookingModal = () => {
-  editingBooking.value = null
   isBookingModalOpen.value = true
 }
 
-const openEditBookingModal = (booking: Booking) => {
-  editingBooking.value = booking
-  isBookingModalOpen.value = true
-}
-
-const closeBookingModal = () => {
+const closeBookingModal = async () => {
   isBookingModalOpen.value = false
-  editingBooking.value = null
+  await loadUserBookings() // Перезагружаем после создания записи
 }
 </script>
 
@@ -109,9 +163,10 @@ const closeBookingModal = () => {
 
           <div v-else-if="error" class="error-state">
             <p class="error-message">{{ error }}</p>
+            <BaseButton @click="loadUserBookings">Повторить попытку</BaseButton>
           </div>
           
-          <div v-else-if="activeBookings.length === 0" class="no-bookings">
+          <div v-else-if="userBookings.length === 0" class="no-bookings">
             <WashingMachineOutlineIcon :size="64" color="#9CA3AF" />
             <p>У вас пока нет активных записей на стирку</p>
             <BaseButton @click="openBookingModal">Записаться на стирку</BaseButton>
@@ -119,7 +174,7 @@ const closeBookingModal = () => {
           
           <div v-else class="bookings-list">
             <div 
-              v-for="booking in activeBookings" 
+              v-for="booking in userBookings" 
               :key="booking.id" 
               class="booking-card"
             >
@@ -127,18 +182,19 @@ const closeBookingModal = () => {
                 <WashingMachineOutlineIcon :size="40" color="#3D4F61" />
               </div>
               <div class="booking-details">
-                <div class="booking-machine">Машинка #{{ booking.machineId }}</div>
+                <div class="booking-machine">{{ getMachineName(booking.machineId) }}</div>
                 <div class="booking-datetime">
                   <CalendarIcon :size="16" color="#6B7280" />
-                  <span>Слот #{{ booking.slotId }}</span>
+                  <span>{{ getSlotTime(booking.slotId) }}</span>
                 </div>
-                <div class="booking-user">Пользователь ID: {{ booking.userId }}</div>
+                <div class="booking-date">Создано: {{ new Date(booking.createdAt).toLocaleString('ru-RU') }}</div>
               </div>
               <div class="booking-actions">
                 <button 
                   class="cancel-btn" 
                   @click="handleCancelBooking(booking.id)"
                   title="Отменить запись"
+                  :disabled="isLoading"
                 >
                   <TrashIcon :size="20" color="#EF4444" />
                 </button>

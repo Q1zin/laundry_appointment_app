@@ -88,17 +88,36 @@ export function useAuth() {
       token.value = data.token
       setCookie(TOKEN_KEY, data.token)
 
-      // Создаём объект пользователя
-      const userData: User = {
-        id: name, // используем name как id
-        name: name,
-        email: `${name}@laundry.local`,
-        role: data.role,
-        blocked: false
-      }
+      // Получаем полные данные пользователя
+      try {
+        const userResponse = await fetch(`${API_BASE}/auth/user/${name}`)
+        if (userResponse.ok) {
+          const fullUserData = await userResponse.json()
+          
+          const userData: User = {
+            id: fullUserData.id, // реальный ID из базы (например "user-1")
+            name: fullUserData.name,
+            email: `${fullUserData.name}@laundry.local`,
+            role: fullUserData.role,
+            blocked: fullUserData.isBlocked || false
+          }
 
-      user.value = userData
-      localStorage.setItem(USER_KEY, JSON.stringify(userData))
+          user.value = userData
+          localStorage.setItem(USER_KEY, JSON.stringify(userData))
+        }
+      } catch (err) {
+        console.error('Failed to fetch user data:', err)
+        // Если не удалось получить данные, используем данные из login
+        const userData: User = {
+          id: name,
+          name: name,
+          email: `${name}@laundry.local`,
+          role: data.role,
+          blocked: false
+        }
+        user.value = userData
+        localStorage.setItem(USER_KEY, JSON.stringify(userData))
+      }
 
       return { success: true, message: data.message }
     } catch (error) {

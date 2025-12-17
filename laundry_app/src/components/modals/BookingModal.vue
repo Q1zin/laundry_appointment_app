@@ -1,17 +1,15 @@
 <script setup lang="ts">
-import { ref, computed, toRef, watch } from 'vue'
+import { ref, computed, toRef, watch, onMounted } from 'vue'
 import WashingMachineOutlineIcon from '@/components/icons/WashingMachineOutlineIcon.vue'
 import UserIcon from '@/components/icons/UserIcon.vue'
 import KeyIcon from '@/components/icons/KeyIcon.vue'
 import { useAuth } from '@/composables/useAuth'
-import { useBookings, type Booking } from '@/composables/useBookings'
-import { useMachines } from '@/composables/useMachines'
-import { useSchedule } from '@/composables/useSchedule'
+import { useBookings } from '@/composables/useBookings'
+import { useSchedule, type Machine, type Timeslot } from '@/composables/useSchedule'
 import { useBodyScrollLock } from '@/composables/useBodyScrollLock'
 
 const props = defineProps<{
   isOpen: boolean
-  editBooking?: Booking | null
 }>()
 
 useBodyScrollLock(toRef(props, 'isOpen'))
@@ -21,94 +19,75 @@ const emit = defineEmits<{
 }>()
 
 const { user } = useAuth()
-const { addBooking, updateBooking } = useBookings()
-const { machines, getActiveMachines } = useMachines()
-const { isSlotBlocked } = useSchedule()
+const { createBooking } = useBookings()
+const { fetchSchedule } = useSchedule()
 
 // Form state
-const selectedMachine = ref<number | null>(null)
-const selectedDateIndex = ref<number>(0)
-const selectedTimeIndex = ref<number | null>(null)
-const fullName = ref('')
-const roomNumber = ref('')
+const selectedMachineId = ref<string | null>(null)
+const selectedSlotId = ref<string | null>(null)
+const selectedDate = ref<string>('')
+const isLoading = ref(false)
+const bookingError = ref<string | null>(null)
+const bookingSuccess = ref(false)
 
-// Режим редактирования
-const isEditMode = computed(() => !!props.editBooking)
+// Schedule data
+const machines = ref<Machine[]>([])
+const timeslots = ref<Timeslot[]>([])
 
-// Initialize from user data or edit booking
-watch(() => props.isOpen, (isOpen) => {
+// Загрузка расписания при открытии модалки
+const loadSchedule = async () => {
+  if (!user.value?.id || !selectedDate.value) return
+  
+  isLoading.value = true
+  bookingError.value = null
+  
+  const result = await fetchSchedule(selectedDate.value, String(user.value.id))
+  
+  if (result.success && result.data) {
+    machines.value = result.data.machines
+    timeslots.value = result.data.timeslots
+  } else {
+    bookingError.value = result.error || 'Не удалось загрузить расписание'
+  }
+  
+  isLoading.value = false
+}
+
+// Инициализация при открытии
+watch(() => props.isOpen, async (isOpen) => {
   if (isOpen) {
-    if (props.editBooking) {
-      // Режим редактирования - заполняем из существующей записи
-      selectedMachine.value = props.editBooking.machine
-      fullName.value = props.editBooking.fullName || ''
-      roomNumber.value = props.editBooking.room || ''
-      
-      // Находим индекс даты
-      const dateIndex = dates.value.findIndex(d => d.dateStr === props.editBooking!.date)
-      selectedDateIndex.value = dateIndex >= 0 ? dateIndex : 0
-      
-      // Находим индекс времени
-      const timeIndex = timeSlots.findIndex(t => t === props.editBooking!.time)
-      selectedTimeIndex.value = timeIndex >= 0 ? timeIndex : null
-    } else if (user.value) {
-      // Новая запись
-      fullName.value = user.value.fullName || ''
-      roomNumber.value = user.value.room || ''
-      selectedMachine.value = null
-      selectedTimeIndex.value = null
-      selectedDateIndex.value = 0
-    }
+    // Устанавливаем сегодняшнюю дату
+    const today = new Date()
+    selectedDate.value = today.toISOString().split('T')[0] || ''
+    
+    // Сбрасываем выбор
+    selectedMachineId.value = null
+    selectedSlotId.value = null
+    bookingSuccess.value = false
+    bookingError.value = null
+    
+    // Загружаем расписание
+    await loadSchedule()
   }
 }, { immediate: true })
 
-// Активные машинки
-const activeMachines = computed(() => getActiveMachines())
-
-// Generate dates for next 7 days
-const dates = computed(() => {
-  const days = ['ВС', 'ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ']
-  const result: { dayName: string; dayNumber: number; dateStr: string }[] = []
-  const today = new Date()
-  
-  for (let i = 0; i < 7; i++) {
-    const date = new Date(today)
-    date.setDate(today.getDate() + i)
-    const dateStr = date.toISOString().split('T')[0] || ''
-    result.push({
-      dayName: days[date.getDay()] || 'ВС',
-      dayNumber: date.getDate(),
-      dateStr
-    })
-  }
-  return result
+// Доступные машинки (не заблокированные)
+const availableMachines = computed(() => {
+  return machines.value.filter(m => m.status === 'available' || !m.alreadyBlocked)
 })
 
-const timeSlots = [
-  '9:45 - 11:45',
-  '14:00 - 16:00',
-  '18:00 - 20:00',
-  '21:00 - 23:00'
-]
+// Доступные слоты для выбранной машинки
+const availableSlots = computed(() => {
+  if (!selectedMachineId.value) return []
+  
+  return timeslots.value.filter(
+    slot => slot.machineId === selectedMachineId.value && slot.isAvailable
+  )
+})
 
-// Проверка доступности слота
-const isTimeSlotAvailable = (timeIndex: number) => {
-  if (selectedMachine.value === null) return true
-  const selectedDate = dates.value[selectedDateIndex.value]
-  if (!selectedDate) return true
-  const time = timeSlots[timeIndex]
-  if (!time) return true
-  return !isSlotBlocked(selectedDate.dateStr, time, selectedMachine.value)
-}
-
-// Проверка доступности машинки
-const isMachineAvailable = (machineId: number) => {
-  if (selectedTimeIndex.value === null) return true
-  const selectedDate = dates.value[selectedDateIndex.value]
-  if (!selectedDate) return true
-  const time = timeSlots[selectedTimeIndex.value]
-  if (!time) return true
-  return !isSlotBlocked(selectedDate.dateStr, time, machineId)
+// Форматирование времени слота
+const formatSlotTime = (slot: Timeslot) => {
+  return `${slot.startTime} - ${slot.endTime}`
 }
 
 const closeModal = () => {
@@ -122,42 +101,34 @@ const handleOverlayClick = (e: MouseEvent) => {
 }
 
 const canSubmit = computed(() => {
-  return selectedMachine.value !== null && 
-         selectedTimeIndex.value !== null && 
-         fullName.value && 
-         roomNumber.value
+  return selectedMachineId.value !== null && 
+         selectedSlotId.value !== null &&
+         !isLoading.value
 })
 
-const handleSubmit = () => {
-  if (!canSubmit.value) return
+const handleSubmit = async () => {
+  if (!canSubmit.value || !user.value?.id) return
   
-  const selectedDate = dates.value[selectedDateIndex.value]
-  if (!selectedDate) return
+  isLoading.value = true
+  bookingError.value = null
+  bookingSuccess.value = false
   
-  const time = timeSlots[selectedTimeIndex.value!]
-  if (!time) return
-
-  const machine = activeMachines.value.find(m => m.id === selectedMachine.value)
+  const result = await createBooking(
+    String(user.value.id),
+    selectedMachineId.value!,
+    selectedSlotId.value!
+  )
   
-  const bookingData = {
-    machine: selectedMachine.value!,
-    machineName: machine?.name,
-    date: selectedDate.dateStr,
-    dayName: selectedDate.dayName,
-    dayNumber: selectedDate.dayNumber,
-    time: time,
-    fullName: fullName.value,
-    room: roomNumber.value,
-    userEmail: user.value?.email
-  }
-
-  if (isEditMode.value && props.editBooking) {
-    updateBooking(props.editBooking.id, bookingData)
+  isLoading.value = false
+  
+  if (result.success) {
+    bookingSuccess.value = true
+    setTimeout(() => {
+      closeModal()
+    }, 1500)
   } else {
-    addBooking(bookingData)
+    bookingError.value = result.message || 'Не удалось создать запись'
   }
-  
-  closeModal()
 }
 </script>
 
@@ -173,94 +144,83 @@ const handleSubmit = () => {
           </button>
 
           <!-- Title -->
-          <h2 class="modal-title">{{ isEditMode ? 'ПЕРЕНОС ЗАПИСИ' : 'ЗАПИСЬ НА СТИРКУ' }}</h2>
+          <h2 class="modal-title">ЗАПИСЬ НА СТИРКУ</h2>
           <div class="title-divider"></div>
 
-          <!-- Date Selection -->
-          <div class="section">
-            <h3 class="section-title">ВЫБЕРИТЕ ДАТУ</h3>
-            <div class="dates-grid">
-              <button
-                v-for="(date, index) in dates"
-                :key="index"
-                class="date-btn"
-                :class="{ active: selectedDateIndex === index }"
-                @click="selectedDateIndex = index"
-              >
-                <span class="day-name">{{ date.dayName }}</span>
-                <span class="day-number">{{ date.dayNumber }}</span>
-              </button>
-            </div>
+          <!-- Loading State -->
+          <div v-if="isLoading" class="loading-state">
+            <p>Загрузка...</p>
           </div>
 
-          <!-- Time Selection -->
-          <div class="section">
-            <h3 class="section-title">ВЫБЕРИТЕ ВРЕМЯ</h3>
-            <div class="times-grid">
-              <button
-                v-for="(time, index) in timeSlots"
-                :key="index"
-                class="time-btn"
-                :class="{ active: selectedTimeIndex === index, disabled: !isTimeSlotAvailable(index) }"
-                :disabled="!isTimeSlotAvailable(index)"
-                @click="selectedTimeIndex = index"
-              >
-                {{ time }}
-              </button>
-            </div>
+          <!-- Error State -->
+          <div v-else-if="bookingError" class="error-message">
+            {{ bookingError }}
           </div>
 
-          <!-- Machine Selection -->
-          <div class="section">
-            <h3 class="section-title">ВЫБЕРИТЕ МАШИНКУ</h3>
-            <div class="machines-grid">
-              <button 
-                v-for="machine in activeMachines" 
-                :key="machine.id"
-                class="machine-card"
-                :class="{ active: selectedMachine === machine.id, disabled: !isMachineAvailable(machine.id) }"
-                :disabled="!isMachineAvailable(machine.id)"
-                @click="selectedMachine = machine.id"
-              >
-                <WashingMachineOutlineIcon :size="50" />
-                <span class="machine-name">{{ machine.name }}</span>
-              </button>
-            </div>
+          <!-- Success State -->
+          <div v-else-if="bookingSuccess" class="success-message">
+            ✓ Запись успешно создана!
           </div>
 
-          <!-- Input Fields (readonly) -->
-          <div class="section inputs-section">
-            <div class="input-group">
-              <UserIcon :size="24" class="input-icon" />
-              <input 
-                v-model="fullName"
-                type="text" 
-                placeholder="ФАМИЛИЯ И ИМЯ" 
-                class="input-field"
-                readonly
-              />
+          <!-- Main Form -->
+          <template v-else>
+            <!-- Machine Selection -->
+            <div class="section">
+              <h3 class="section-title">ВЫБЕРИТЕ МАШИНКУ</h3>
+              <div v-if="availableMachines.length === 0" class="no-data">
+                Нет доступных машинок
+              </div>
+              <div v-else class="machines-grid">
+                <button 
+                  v-for="machine in availableMachines" 
+                  :key="machine.id"
+                  class="machine-card"
+                  :class="{ active: selectedMachineId === machine.id }"
+                  @click="selectedMachineId = machine.id; selectedSlotId = null"
+                >
+                  <WashingMachineOutlineIcon :size="50" />
+                  <span class="machine-name">{{ machine.name }}</span>
+                </button>
+              </div>
             </div>
-            <div class="input-group">
-              <KeyIcon :size="24" class="input-icon" />
-              <input 
-                v-model="roomNumber"
-                type="text" 
-                placeholder="НОМЕР КОМНАТЫ" 
-                class="input-field"
-                readonly
-              />
-            </div>
-          </div>
 
-          <!-- Submit Button -->
-          <button 
-            class="submit-btn" 
-            :class="{ disabled: !canSubmit }"
-            :disabled="!canSubmit"
-            @click="handleSubmit"
-          >
-            {{ isEditMode ? 'ПЕРЕНЕСТИ' : 'ЗАПИСАТЬСЯ' }}
-          </button>
+            <!-- Time Slot Selection -->
+            <div v-if="selectedMachineId" class="section">
+              <h3 class="section-title">ВЫБЕРИТЕ ВРЕМЯ</h3>
+              <div v-if="availableSlots.length === 0" class="no-data">
+                Нет доступных слотов для этой машинки
+              </div>
+              <div v-else class="times-grid">
+                <button
+                  v-for="slot in availableSlots"
+                  :key="slot.id"
+                  class="time-btn"
+                  :class="{ active: selectedSlotId === slot.id }"
+                  @click="selectedSlotId = slot.id"
+                >
+                  {{ formatSlotTime(slot) }}
+                </button>
+              </div>
+            </div>
+
+            <!-- User Info -->
+            <div class="section inputs-section">
+              <div class="info-row">
+                <UserIcon :size="24" class="input-icon" />
+                <span class="info-text">Пользователь: {{ user?.name || 'Не указан' }}</span>
+              </div>
+            </div>
+
+            <!-- Submit Button -->
+            <button 
+              class="submit-btn" 
+              :class="{ disabled: !canSubmit }"
+              :disabled="!canSubmit"
+              @click="handleSubmit"
+            >
+              {{ isLoading ? 'СОЗДАНИЕ...' : 'ЗАПИСАТЬСЯ' }}
+            </button>
+          </template>
         </div>
       </div>
     </Transition>
@@ -484,39 +444,65 @@ const handleSubmit = () => {
   gap: 15px;
 }
 
-.input-group {
-  position: relative;
-  width: 100%;
+.info-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 15px;
+  background: #F5F8FA;
+  border-radius: 12px;
+  border: 2px solid #E8EEF2;
 }
 
 .input-icon {
-  position: absolute;
-  left: 15px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: #B0B8C0;
+  color: #6B8DB8;
 }
 
-.input-field {
-  width: 100%;
-  height: 50px;
-  border: 2px solid #E8EEF2;
-  border-radius: 12px;
-  padding: 12px 12px 12px 50px;
+.info-text {
   font-size: 14px;
   color: #3D4F61;
-  background: #F8F9FA;
-  outline: none;
-  transition: border-color 0.3s ease;
+  font-weight: 500;
 }
 
-.input-field:read-only {
-  cursor: default;
-  background: #F0F2F4;
+/* States */
+.loading-state {
+  padding: 60px 40px;
+  text-align: center;
 }
 
-.input-field::placeholder {
-  color: #C8D0D8;
+.loading-state p {
+  font-size: 18px;
+  color: #6B8DB8;
+}
+
+.error-message {
+  padding: 15px 20px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 2px solid rgba(239, 68, 68, 0.3);
+  border-radius: 12px;
+  color: #EF4444;
+  font-size: 15px;
+  text-align: center;
+  margin: 20px 0;
+}
+
+.success-message {
+  padding: 15px 20px;
+  background: rgba(34, 197, 94, 0.1);
+  border: 2px solid rgba(34, 197, 94, 0.3);
+  border-radius: 12px;
+  color: #22C55E;
+  font-size: 15px;
+  font-weight: 600;
+  text-align: center;
+  margin: 20px 0;
+}
+
+.no-data {
+  padding: 30px;
+  text-align: center;
+  color: #9CA3AF;
+  font-size: 14px;
 }
 
 .input-field:focus {
