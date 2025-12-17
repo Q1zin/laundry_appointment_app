@@ -13,15 +13,15 @@ const steps = [
   },
   {
     number: 2,
-    title: 'ВЫБЕРИ ДАТУ И ВРЕМЯ',
-    icon: TimerIcon,
-    color: '#6BA5A0'
-  },
-  {
-    number: 3,
     title: 'ВЫБЕРИ МАШИНКУ',
     icon: WashingMachineOutlineIcon,
     color: '#6B7B8F'
+  },
+  {
+    number: 3,
+    title: 'ВЫБЕРИ ДАТУ И ВРЕМЯ',
+    icon: TimerIcon,
+    color: '#6BA5A0'
   }
 ]
 </script>

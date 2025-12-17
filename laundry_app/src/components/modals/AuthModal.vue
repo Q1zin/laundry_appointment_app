@@ -223,8 +223,10 @@ const handleRegister = async () => {
               >
                 <template #icon><LockIcon /></template>
               </BaseInput>
+            </div>
 
-              <!-- Ошибка входа -->
+            <!-- Контейнер для ошибки с фиксированной высотой -->
+            <div class="error-container">
               <div v-if="loginError" class="error-message">
                 {{ loginError }}
               </div>
@@ -238,11 +240,11 @@ const handleRegister = async () => {
               {{ isLoginLoading ? 'ВХОД...' : 'ВОЙТИ' }}
             </BaseButton>
 
-            <!-- Подсказка для тестирования -->
+            <!-- Подсказка для тестирования
             <p class="hint-text">
               Тестовый логин: <strong>admin</strong> или <strong>john_doe</strong><br>
               Пароль: <strong>password123</strong>
-            </p>
+            </p> -->
           </form>
 
           <!-- Register Form -->
@@ -306,8 +308,10 @@ const handleRegister = async () => {
               >
                 <template #icon><LockIcon /></template>
               </BaseInput>
+            </div>
 
-              <!-- Ошибка регистрации -->
+            <!-- Контейнер для ошибки с фиксированной высотой -->
+            <div class="error-container">
               <div v-if="regError" class="error-message">
                 {{ regError }}
               </div>
@@ -423,7 +427,16 @@ const handleRegister = async () => {
   display: flex;
   flex-direction: column;
   gap: 25px;
-  margin-bottom: 40px;
+  margin-bottom: 20px;
+}
+
+.error-container {
+  width: 100%;
+  min-height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 15px;
 }
 
 .submit-btn {
@@ -459,6 +472,7 @@ const handleRegister = async () => {
   }
 
 .error-message {
+  width: 100%;
   padding: 12px;
   background: rgba(239, 68, 68, 0.1);
   border: 1px solid rgba(239, 68, 68, 0.3);
@@ -466,7 +480,6 @@ const handleRegister = async () => {
   color: #ef4444;
   font-size: 14px;
   text-align: center;
-  margin-top: 8px;
 }
 
 .hint-text {

@@ -12,6 +12,7 @@ import UserIcon from '@/components/icons/UserIcon.vue'
 import LockIcon from '@/components/icons/LockIcon.vue'
 import EditIcon from '@/components/icons/EditIcon.vue'
 import TheHeader from '@/components/layout/TheHeader.vue'
+import BookingModal from '@/components/modals/BookingModal.vue'
 
 interface AdminUser {
   id: string
@@ -70,6 +71,9 @@ const activeTab = ref<'machines' | 'schedules' | 'users' | 'bookings'>('machines
 const isLoading = ref(false)
 const actionError = ref<string | null>(null)
 const actionSuccess = ref<string | null>(null)
+
+// Модальные окна
+const isBookingModalOpen = ref(false)
 
 // Машинки
 const adminMachines = ref<AdminMachine[]>([])
@@ -509,11 +513,28 @@ const handleUnblockUser = async (userId: string) => {
     isLoading.value = false
   }
 }
+
+// Обработчики модальных окон
+const openBookingModal = () => {
+  isBookingModalOpen.value = true
+}
+
+const closeBookingModal = () => {
+  isBookingModalOpen.value = false
+}
+
+const scrollToRules = () => {
+  // На странице админки нет раздела правил, просто игнорируем
+}
 </script>
 
 <template>
   <div class="admin-page" v-if="isLoggedIn && isAdmin">
-    <TheHeader variant="dark" />
+    <TheHeader 
+      variant="dark"
+      @booking-click="openBookingModal"
+      @rules-click="scrollToRules"
+    />
 
     <main class="admin-content">
       <div class="container">
@@ -876,6 +897,11 @@ const handleUnblockUser = async (userId: string) => {
         </div>
       </div>
     </main>
+
+    <BookingModal 
+      :is-open="isBookingModalOpen" 
+      @close="closeBookingModal" 
+    />
   </div>
 </template>
 
