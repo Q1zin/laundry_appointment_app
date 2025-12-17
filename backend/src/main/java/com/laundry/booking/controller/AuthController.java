@@ -2,6 +2,7 @@ package com.laundry.booking.controller;
 
 import com.laundry.booking.dto.LoginRequest;
 import com.laundry.booking.dto.LoginResponse;
+import com.laundry.booking.dto.RegisterRequest;
 import com.laundry.booking.entity.User;
 import com.laundry.booking.service.AuthService;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +30,24 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest request) {
         LoginResponse response = authService.login(request);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * POST /api/auth/register
+     * Body: { username, password, email, fullName, room, contract }
+     * Response: { success: boolean, message: String, token: String, role: String }
+     */
+    @PostMapping("/register")
+    public ResponseEntity<LoginResponse> register(@RequestBody RegisterRequest request) {
+        LoginResponse response = authService.register(
+            request.getUsername(),
+            request.getPassword(),
+            request.getEmail(),
+            request.getFullName(),
+            request.getRoom(),
+            request.getContract()
+        );
         return ResponseEntity.ok(response);
     }
 

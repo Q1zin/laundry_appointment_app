@@ -50,6 +50,34 @@ public class AuthService {
     }
 
     /**
+     * Регистрация нового пользователя
+     */
+    public LoginResponse register(String username, String password, String email, String fullName, String room, String contract) {
+        // Проверка существования пользователя
+        if (userRepository.findByName(username).isPresent()) {
+            return new LoginResponse(false, "Username already exists", null, null);
+        }
+
+        // Создание нового пользователя
+        User newUser = new User();
+        newUser.setName(username);
+        newUser.setPasswordHash(passwordEncoder.encode(password));
+        newUser.setRole("user");
+        newUser.setIsBlocked(false);
+        newUser.setEmail(email);
+        newUser.setFullName(fullName);
+        newUser.setRoom(room);
+        newUser.setContract(contract);
+
+        userRepository.save(newUser);
+
+        // Генерация токена для автоматического входа
+        String token = jwtUtil.generateToken(newUser.getName(), newUser.getRole());
+
+        return new LoginResponse(true, "Registration successful", token, newUser.getRole());
+    }
+
+    /**
      * Получить пользователя по имени
      */
     public User getUser(String username) {

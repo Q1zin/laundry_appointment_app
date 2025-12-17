@@ -12,6 +12,10 @@ CREATE TABLE users (
     password_hash VARCHAR(255) NOT NULL,
     role VARCHAR(50) NOT NULL,
     is_blocked BOOLEAN NOT NULL DEFAULT FALSE,
+    email VARCHAR(255),
+    full_name VARCHAR(255),
+    room VARCHAR(10),
+    contract VARCHAR(20),
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 

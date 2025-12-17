@@ -31,6 +31,18 @@ public class User {
     @Column(nullable = false)
     private Boolean isBlocked = false;
 
+    @Column
+    private String email;
+
+    @Column
+    private String fullName;
+
+    @Column
+    private String room;
+
+    @Column
+    private String contract;
+
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;

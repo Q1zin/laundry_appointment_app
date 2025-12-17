@@ -35,9 +35,9 @@ const loginError = ref('')
 const isLoginLoading = ref(false)
 
 // Register form
+const regUsername = ref('')
 const regEmail = ref('')
 const regFullName = ref('')
-const regGroup = ref('')
 const regRoom = ref('')
 const regContract = ref('')
 const regPassword = ref('')
@@ -100,9 +100,23 @@ const handleLogin = async () => {
 }
 
 const handleRegister = async () => {
-  // Валидация
-  if (!regEmail.value || !regFullName.value) {
+  // Валидация обязательных полей
+  if (!regUsername.value || !regEmail.value || !regFullName.value || !regRoom.value || !regContract.value) {
     regError.value = 'Заполните все обязательные поля'
+    return
+  }
+  
+  // Валидация комнаты (3 цифры + М/Б)
+  const roomPattern = /^\d{3}[МБмб]$/
+  if (!roomPattern.test(regRoom.value)) {
+    regError.value = 'Комната должна быть в формате: 3 цифры + М или Б (например, 107М)'
+    return
+  }
+  
+  // Валидация договора (ОБ5-****)
+  const contractPattern = /^ОБ5-\d{4}$/i
+  if (!contractPattern.test(regContract.value)) {
+    regError.value = 'Договор должен быть в формате: ОБ5-**** (например, ОБ5-1234)'
     return
   }
   
@@ -121,24 +135,26 @@ const handleRegister = async () => {
   
   try {
     const result = await register({
+      username: regUsername.value,
       email: regEmail.value,
-      name: regFullName.value,
+      fullName: regFullName.value,
+      room: regRoom.value.toUpperCase(),
+      contract: regContract.value.toUpperCase(),
       password: regPassword.value
     })
     
     if (result.success) {
-      // Успешная регистрация
+      // Успешная регистрация - автоматический вход
+      regUsername.value = ''
       regEmail.value = ''
       regFullName.value = ''
-      regGroup.value = ''
       regRoom.value = ''
       regContract.value = ''
       regPassword.value = ''
       regPasswordConfirm.value = ''
       
-      // Показываем сообщение и переключаемся на вход
-      alert('Регистрация успешна! Теперь войдите в систему.')
-      mode.value = 'login'
+      emit('success')
+      closeModal()
     } else {
       regError.value = result.message || 'Ошибка регистрации'
     }
@@ -233,6 +249,14 @@ const handleRegister = async () => {
           <form v-else class="auth-form" @submit.prevent="handleRegister">
             <div class="form-fields">
               <BaseInput 
+                v-model="regUsername" 
+                placeholder="Логин"
+                :disabled="isRegLoading"
+              >
+                <template #icon><UserIcon /></template>
+              </BaseInput>
+
+              <BaseInput 
                 v-model="regFullName" 
                 placeholder="ФИО"
                 :disabled="isRegLoading"
@@ -247,6 +271,22 @@ const handleRegister = async () => {
                 :disabled="isRegLoading"
               >
                 <template #icon><UserIcon /></template>
+              </BaseInput>
+
+              <BaseInput 
+                v-model="regRoom" 
+                placeholder="Комната (например, 107М)"
+                :disabled="isRegLoading"
+              >
+                <template #icon><HomeIcon /></template>
+              </BaseInput>
+
+              <BaseInput 
+                v-model="regContract" 
+                placeholder="Договор найма (например, ОБ5-1234)"
+                :disabled="isRegLoading"
+              >
+                <template #icon><DocumentIcon /></template>
               </BaseInput>
 
               <BaseInput 
@@ -271,11 +311,6 @@ const handleRegister = async () => {
               <div v-if="regError" class="error-message">
                 {{ regError }}
               </div>
-
-              <!-- Информация -->
-              <p class="info-text">
-                Регистрация пока недоступна. Используйте тестовые учетные данные.
-              </p>
             </div>
 
             <BaseButton 

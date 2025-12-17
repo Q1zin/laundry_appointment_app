@@ -130,15 +130,63 @@ export function useAuth() {
   }
 
   const register = async (userData: {
-    email: string
-    name: string
+    username: string
     password: string
+    email: string
+    fullName: string
+    room: string
+    contract: string
   }) => {
-    // Backend пока не поддерживает регистрацию
-    // В будущем можно добавить POST /api/auth/register
-    return { 
-      success: false, 
-      message: 'Registration not implemented yet' 
+    try {
+      const response = await fetch(`${API_BASE}/auth/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(userData)
+      })
+
+      const data = await response.json()
+
+      if (!response.ok || !data.success) {
+        return { 
+          success: false, 
+          message: data.message || 'Registration failed' 
+        }
+      }
+
+      // Автоматический вход после регистрации
+      token.value = data.token
+      setCookie(TOKEN_KEY, data.token)
+
+      // Получаем полные данные пользователя
+      try {
+        const userResponse = await fetch(`${API_BASE}/auth/user/${userData.username}`)
+        if (userResponse.ok) {
+          const fullUserData = await userResponse.json()
+          
+          const newUser: User = {
+            id: fullUserData.id,
+            name: fullUserData.name,
+            email: fullUserData.email || userData.email,
+            role: fullUserData.role,
+            blocked: fullUserData.isBlocked || false
+          }
+
+          user.value = newUser
+          localStorage.setItem(USER_KEY, JSON.stringify(newUser))
+        }
+      } catch (err) {
+        console.error('Failed to fetch user data:', err)
+      }
+
+      return { success: true, message: data.message }
+    } catch (error) {
+      console.error('Registration error:', error)
+      return { 
+        success: false, 
+        message: 'Ошибка сети. Попробуйте снова.' 
+      }
     }
   }
 
