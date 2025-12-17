@@ -3,10 +3,14 @@ package com.laundry.booking.controller;
 import com.laundry.booking.dto.BookingResult;
 import com.laundry.booking.dto.DateRequest;
 import com.laundry.booking.dto.MachineRequest;
+import com.laundry.booking.dto.UserRequest;
+import com.laundry.booking.entity.User;
 import com.laundry.booking.service.AdminService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 /**
  * Admin Controller - Admin Panel UI
@@ -16,6 +20,9 @@ import org.springframework.web.bind.annotation.*;
  * - POST /api/admin/bookings/open
  * - POST /api/admin/bookings/close
  * - DELETE /api/admin/bookings/:bookingId
+ * - GET /api/admin/users
+ * - POST /api/admin/users/block
+ * - POST /api/admin/users/unblock
  */
 @RestController
 @RequestMapping("/api/admin")
@@ -76,6 +83,38 @@ public class AdminController {
     @DeleteMapping("/bookings/{bookingId}")
     public ResponseEntity<BookingResult> deleteBooking(@PathVariable String bookingId) {
         BookingResult result = adminService.deleteBooking(bookingId);
+        return ResponseEntity.ok(result);
+    }
+
+    /**
+     * GET /api/admin/users
+     * Response: List<User>
+     */
+    @GetMapping("/users")
+    public ResponseEntity<List<User>> getAllUsers() {
+        List<User> users = adminService.getAllUsers();
+        return ResponseEntity.ok(users);
+    }
+
+    /**
+     * POST /api/admin/users/block
+     * Body: { userId: String }
+     * Response: { result: boolean, message: String }
+     */
+    @PostMapping("/users/block")
+    public ResponseEntity<BookingResult> blockUser(@RequestBody UserRequest request) {
+        BookingResult result = adminService.blockUser(request.getUserId());
+        return ResponseEntity.ok(result);
+    }
+
+    /**
+     * POST /api/admin/users/unblock
+     * Body: { userId: String }
+     * Response: { result: boolean, message: String }
+     */
+    @PostMapping("/users/unblock")
+    public ResponseEntity<BookingResult> unblockUser(@RequestBody UserRequest request) {
+        BookingResult result = adminService.unblockUser(request.getUserId());
         return ResponseEntity.ok(result);
     }
 }

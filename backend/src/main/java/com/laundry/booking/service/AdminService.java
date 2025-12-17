@@ -5,10 +5,12 @@ import com.laundry.booking.entity.Booking;
 import com.laundry.booking.entity.Machine;
 import com.laundry.booking.entity.Schedule;
 import com.laundry.booking.entity.Timeslot;
+import com.laundry.booking.entity.User;
 import com.laundry.booking.repository.BookingRepository;
 import com.laundry.booking.repository.MachineRepository;
 import com.laundry.booking.repository.ScheduleRepository;
 import com.laundry.booking.repository.TimeslotRepository;
+import com.laundry.booking.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,6 +26,7 @@ public class AdminService {
     private final ScheduleRepository scheduleRepository;
     private final BookingRepository bookingRepository;
     private final TimeslotRepository timeslotRepository;
+    private final UserRepository userRepository;
 
     /**
      * Admin Controller - blockMachine method
@@ -172,5 +175,60 @@ public class AdminService {
         }
 
         return new BookingResult(true, "Booking deleted successfully");
+    }
+
+    /**
+     * Admin Controller - getAllUsers method
+     * Возвращает список всех пользователей
+     */
+    public List<User> getAllUsers() {
+        return userRepository.findAll();
+    }
+
+    /**
+     * Admin Controller - blockUser method
+     * Блокирует пользователя
+     */
+    @Transactional
+    public BookingResult blockUser(String userId) {
+        User user = userRepository.findById(userId).orElse(null);
+        if (user == null) {
+            return new BookingResult(false, "User not found");
+        }
+
+        if (user.getIsBlocked()) {
+            return new BookingResult(false, "User is already blocked");
+        }
+
+        // Нельзя блокировать админа
+        if ("admin".equals(user.getRole())) {
+            return new BookingResult(false, "Cannot block admin user");
+        }
+
+        user.setIsBlocked(true);
+        userRepository.save(user);
+
+        return new BookingResult(true, "User blocked successfully");
+    }
+
+    /**
+     * Admin Controller - unblockUser method
+     * Разблокирует пользователя
+     */
+    @Transactional
+    public BookingResult unblockUser(String userId) {
+        User user = userRepository.findById(userId).orElse(null);
+        if (user == null) {
+            return new BookingResult(false, "User not found");
+        }
+
+        if (!user.getIsBlocked()) {
+            return new BookingResult(false, "User is not blocked");
+        }
+
+        user.setIsBlocked(false);
+        userRepository.save(user);
+
+        return new BookingResult(true, "User unblocked successfully");
     }
 }

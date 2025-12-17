@@ -299,7 +299,7 @@ const closeBookingModal = async () => {
   font-size: 16px;
   font-weight: 600;
   color: #6B7280;
-  min-width: 100px;
+  min-width: 130px;
 }
 
 .info-value {
