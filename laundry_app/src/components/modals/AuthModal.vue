@@ -179,7 +179,7 @@ const handleRegister = async () => {
 
           <!-- Icon -->
           <div class="icon-container">
-            <WashingMachineIcon :size="100" />
+            <WashingMachineIcon :size="80" />
           </div>
 
           <!-- Title -->
@@ -349,13 +349,13 @@ const handleRegister = async () => {
 .modal-card {
   position: relative;
   width: 100%;
-  max-width: 500px;
+  max-width: 450px;
   max-height: 90vh;
   overflow-y: auto;
   background-color: #FFFFFF;
   border-radius: 16px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-  padding: 50px 40px;
+  padding: 30px 30px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -363,8 +363,8 @@ const handleRegister = async () => {
 
 .close-btn {
   position: absolute;
-  top: 20px;
-  right: 20px;
+  top: 15px;
+  right: 15px;
   background: none;
   border: none;
   cursor: pointer;
@@ -378,29 +378,29 @@ const handleRegister = async () => {
 }
 
 .icon-container {
-  margin-bottom: 15px;
+  margin-bottom: 10px;
 }
 
 .modal-title {
-  font-size: 32px;
+  font-size: 24px;
   font-weight: bold;
   color: #2C3E50;
-  margin-bottom: 25px;
+  margin-bottom: 20px;
 }
 
 .mode-switcher {
   display: flex;
-  gap: 10px;
-  margin-bottom: 30px;
+  gap: 8px;
+  margin-bottom: 20px;
 }
 
 .mode-btn {
-  padding: 10px 25px;
+  padding: 8px 20px;
   border: 2px solid #2C3E50;
   background: transparent;
   color: #2C3E50;
-  border-radius: 25px;
-  font-size: 14px;
+  border-radius: 20px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
@@ -426,21 +426,21 @@ const handleRegister = async () => {
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 25px;
-  margin-bottom: 20px;
+  gap: 15px;
+  margin-bottom: 15px;
 }
 
 .error-container {
   width: 100%;
-  min-height: 30px;
+  min-height: 25px;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 15px;
+  margin-bottom: 12px;
 }
 
 .submit-btn {
-  min-width: 200px;
+  min-width: 180px;
 }
 
 /* Transitions */
