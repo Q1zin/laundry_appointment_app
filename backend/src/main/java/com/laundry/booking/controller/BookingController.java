@@ -6,6 +6,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 /**
  * Booking Controller - Booking UI
  * Endpoints:
@@ -13,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
  * - POST /api/bookings/cancel
  * - POST /api/bookings/reschedule
  * - GET /api/bookings/can-book/:userId
+ * - GET /api/bookings/user/:userId
  * - GET /api/slots/available/:machineId/:slotId
  */
 @RestController
@@ -75,6 +78,16 @@ public class BookingController {
     public ResponseEntity<Boolean> canUserBook(@PathVariable String userId) {
         boolean canBook = bookingService.canUserBook(userId);
         return ResponseEntity.ok(canBook);
+    }
+
+    /**
+     * GET /api/bookings/user/:userId
+     * Response: List<UserBookingDto>
+     */
+    @GetMapping("/user/{userId}")
+    public ResponseEntity<List<UserBookingDto>> getUserBookings(@PathVariable String userId) {
+        List<UserBookingDto> bookings = bookingService.getUserBookings(userId);
+        return ResponseEntity.ok(bookings);
     }
 
     /**

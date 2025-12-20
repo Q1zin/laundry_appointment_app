@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import TheHeader from '@/components/layout/TheHeader.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -7,75 +7,76 @@ import BookingModal from '@/components/modals/BookingModal.vue'
 import WashingMachineOutlineIcon from '@/components/icons/WashingMachineOutlineIcon.vue'
 import CalendarIcon from '@/components/icons/CalendarIcon.vue'
 import TrashIcon from '@/components/icons/TrashIcon.vue'
-import EditIcon from '@/components/icons/EditIcon.vue'
 import { useAuth } from '@/composables/useAuth'
-import { useSchedule, type Booking as ScheduleBooking, type Machine, type Timeslot } from '@/composables/useSchedule'
-import { toLocalISODate } from '@/utils/date'
+
+// Тип для записи пользователя (от нового эндпоинта)
+interface UserBooking {
+  id: string
+  machineId: string
+  machineName: string
+  slotId: string
+  slotStartTime: string
+  slotEndTime: string
+  state: string
+  createdAt: string
+}
 
 const router = useRouter()
 const { isLoggedIn, user, logout } = useAuth()
-const { fetchSchedule } = useSchedule()
 
 const isBookingModalOpen = ref(false)
 const isLoading = ref(false)
 const error = ref<string | null>(null)
-const bookings = ref<ScheduleBooking[]>([])
-const machines = ref<Machine[]>([])
-const timeslots = ref<Timeslot[]>([])
+const userBookings = ref<UserBooking[]>([])
 
-// Загрузка расписания и записей
+// Загрузка записей пользователя
 const loadUserBookings = async () => {
   if (!user.value?.id) return
   
   isLoading.value = true
   error.value = null
   
-  const today = toLocalISODate(new Date())
-  const result = await fetchSchedule(today, String(user.value.id))
-  
-  if (result.success && result.data) {
-    machines.value = result.data.machines
-    timeslots.value = result.data.timeslots
-    bookings.value = result.data.bookings
-  } else {
-    error.value = result.error || 'Не удалось загрузить записи'
+  try {
+    const response = await fetch(`/api/bookings/user/${user.value.id}`)
+    
+    if (response.ok) {
+      userBookings.value = await response.json()
+    } else {
+      error.value = 'Не удалось загрузить записи'
+    }
+  } catch (err) {
+    error.value = 'Ошибка соединения с сервером'
   }
   
   isLoading.value = false
 }
 
-// Фильтруем только записи текущего пользователя
-const userBookings = computed(() => {
-  if (!user.value?.id) return []
-  return bookings.value.filter(b => b.userId === user.value.id && b.state === 'active')
-})
-
-// Получаем данные машинки по ID
-const getMachineName = (machineId: string) => {
-  const machine = machines.value.find(m => m.id === machineId)
-  return machine?.name || `Машинка #${machineId}`
-}
-
 // Форматирование времени из ISO в HH:MM
-// Парсим напрямую чтобы избежать сдвига timezone
 const formatTime = (isoString: string) => {
-  // Если строка в формате "2025-12-17T10:00:00", парсим напрямую
+  if (!isoString) return ''
   const timePart = isoString.split('T')[1]
   if (timePart) {
     const [hours, minutes] = timePart.split(':')
     return `${hours}:${minutes}`
   }
-  // Fallback на Date если формат другой
   const date = new Date(isoString)
-  const hours = date.getHours()
-  const minutes = date.getMinutes()
-  return `${hours}:${minutes.toString().padStart(2, '0')}`
+  return `${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`
 }
 
-// Получаем данные слота по ID
-const getSlotTime = (slotId: string) => {
-  const slot = timeslots.value.find(s => s.slotId === slotId)
-  return slot ? `${formatTime(slot.startTime)} - ${formatTime(slot.endTime)}` : `Слот #${slotId}`
+// Форматирование даты
+const formatDate = (isoString: string) => {
+  if (!isoString) return ''
+  const datePart = isoString.split('T')[0]
+  if (datePart) {
+    const [year, month, day] = datePart.split('-')
+    return `${day}.${month}.${year}`
+  }
+  return new Date(isoString).toLocaleDateString('ru-RU')
+}
+
+// Форматирование времени слота
+const formatSlotTime = (booking: UserBooking) => {
+  return `${formatTime(booking.slotStartTime)} - ${formatTime(booking.slotEndTime)}`
 }
 
 // Редирект если не авторизован + загрузка записей
@@ -211,10 +212,10 @@ const closeBookingModal = async () => {
                 <WashingMachineOutlineIcon :size="40" color="#3D4F61" />
               </div>
               <div class="booking-details">
-                <div class="booking-machine">{{ getMachineName(booking.machineId) }}</div>
+                <div class="booking-machine">{{ booking.machineName }}</div>
                 <div class="booking-datetime">
                   <CalendarIcon :size="16" color="#6B7280" />
-                  <span>{{ getSlotTime(booking.slotId) }}</span>
+                  <span>{{ formatDate(booking.slotStartTime) }}, {{ formatSlotTime(booking) }}</span>
                 </div>
                 <div class="booking-date">Создано: {{ new Date(booking.createdAt).toLocaleString('ru-RU') }}</div>
               </div>

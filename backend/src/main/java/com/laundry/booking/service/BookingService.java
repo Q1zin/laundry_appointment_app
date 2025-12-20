@@ -1,15 +1,21 @@
 package com.laundry.booking.service;
 
 import com.laundry.booking.dto.BookingResult;
+import com.laundry.booking.dto.UserBookingDto;
 import com.laundry.booking.entity.Booking;
+import com.laundry.booking.entity.Machine;
 import com.laundry.booking.entity.Timeslot;
 import com.laundry.booking.entity.User;
 import com.laundry.booking.repository.BookingRepository;
+import com.laundry.booking.repository.MachineRepository;
 import com.laundry.booking.repository.TimeslotRepository;
 import com.laundry.booking.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -18,6 +24,7 @@ public class BookingService {
     private final BookingRepository bookingRepository;
     private final TimeslotRepository timeslotRepository;
     private final UserRepository userRepository;
+    private final MachineRepository machineRepository;
 
     /**
      * Booking Controller - createBooking method
@@ -227,5 +234,39 @@ public class BookingService {
 
         // Проверить, что новый слот не занят
         return !bookingRepository.existsBySlotIdAndState(newSlotId, "active");
+    }
+
+    /**
+     * Получить все активные записи пользователя с информацией о машинках и слотах
+     */
+    public List<UserBookingDto> getUserBookings(String userId) {
+        List<Booking> bookings = bookingRepository.findByUserIdAndState(userId, "active");
+        List<UserBookingDto> result = new ArrayList<>();
+
+        for (Booking booking : bookings) {
+            UserBookingDto dto = new UserBookingDto();
+            dto.setId(booking.getId());
+            dto.setMachineId(booking.getMachineId());
+            dto.setSlotId(booking.getSlotId());
+            dto.setState(booking.getState());
+            dto.setCreatedAt(booking.getCreatedAt());
+
+            // Получаем данные машинки
+            Machine machine = machineRepository.findById(booking.getMachineId()).orElse(null);
+            if (machine != null) {
+                dto.setMachineName(machine.getName());
+            }
+
+            // Получаем данные слота
+            Timeslot slot = timeslotRepository.findById(booking.getSlotId()).orElse(null);
+            if (slot != null) {
+                dto.setSlotStartTime(slot.getStartTime());
+                dto.setSlotEndTime(slot.getEndTime());
+            }
+
+            result.add(dto);
+        }
+
+        return result;
     }
 }
