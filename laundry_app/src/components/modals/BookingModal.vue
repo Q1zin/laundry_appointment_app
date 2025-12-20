@@ -67,11 +67,24 @@ const allDates = computed<DateOption[]>(() => {
 const availableMachines = computed<Machine[]>(() => {
   const machineMap = new Map<string, Machine>()
   
-  for (const entry of schedulesMap.value.values()) {
+  for (const [date, entry] of schedulesMap.value.entries()) {
     for (const machine of entry.machines) {
       // Берём только доступные (не заблокированные)
       if (machine.status === 'available' || !machine.alreadyBlocked) {
-        machineMap.set(machine.id, machine)
+        // Проверяем, есть ли хотя бы один свободный слот для этой машинки в эту дату
+        const occupiedSlotIds = entry.bookings
+          .filter(b => b.machineId === machine.id && b.state === 'active')
+          .map(b => b.slotId)
+        
+        const hasFreeSlots = entry.timeslots.some(
+          slot => slot.machineId === machine.id && 
+                  !occupiedSlotIds.includes(slot.slotId)
+        )
+        
+        // Добавляем машинку только если у неё есть свободные слоты
+        if (hasFreeSlots) {
+          machineMap.set(machine.id, machine)
+        }
       }
     }
   }
