@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 import { useToast } from '@/composables/useToast'
 import { useMachines } from '@/composables/useMachines'
-import { useSchedule, type Machine } from '@/composables/useSchedule'
+import { useSchedule, type Machine, type Timeslot } from '@/composables/useSchedule'
 import { useAdminBookings } from '@/composables/useAdminBookings'
 import WashingMachineOutlineIcon from '@/components/icons/WashingMachineOutlineIcon.vue'
 import CalendarIcon from '@/components/icons/CalendarIcon.vue'
@@ -91,6 +91,12 @@ interface CalendarDay {
   machines: Map<string, CalendarSlot[]>
 }
 
+interface CalendarScheduleData {
+  machines: Array<{ id: string; name?: string }>
+  timeslots: Timeslot[]
+  bookings?: AdminBooking[]
+}
+
 const calendarDays = ref<CalendarDay[]>([])
 
 // Модальные окна
@@ -174,17 +180,18 @@ const loadCalendarData = async () => {
     const result = await fetchSchedule(dateStr, 'admin')
     
     if (result.success && result.data) {
+      const schedule = result.data as CalendarScheduleData
       const machines = new Map<string, CalendarSlot[]>()
       
       // Группируем слоты по машинкам
-      result.data.machines.forEach(machine => {
+      schedule.machines.forEach((machine) => {
         const machineSlots: CalendarSlot[] = []
         
-        result.data!.timeslots
-          .filter(slot => slot.machineId === machine.id)
-          .forEach(slot => {
-            const booking = result.data!.bookings?.find(
-              b => b.slotId === slot.slotId && b.state === 'active'
+        schedule.timeslots
+          .filter((slot) => slot.machineId === machine.id)
+          .forEach((slot) => {
+            const booking = schedule.bookings?.find(
+              (b) => b.slotId === slot.slotId && b.state === 'active'
             )
             
             machineSlots.push({
@@ -192,7 +199,7 @@ const loadCalendarData = async () => {
               startTime: slot.startTime,
               endTime: slot.endTime,
               isBooked: !!booking,
-              booking: booking as AdminBooking | undefined
+              booking
             })
           })
         
@@ -206,7 +213,7 @@ const loadCalendarData = async () => {
       
       days.push({
         date: dateStr,
-        dayName: dayNames[date.getDay()],
+        dayName: dayNames[date.getDay()]!,
         dayNum: date.getDate(),
         machines
       })

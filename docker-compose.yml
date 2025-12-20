@@ -1,11 +1,12 @@
 services:
   postgres:
     image: postgres:15-alpine
+    platform: ${PLATFORM:-linux/amd64}
     container_name: laundry-postgres
     environment:
-      POSTGRES_DB: laundry_db
-      POSTGRES_USER: laundry_user
-      POSTGRES_PASSWORD: laundry_password
+      POSTGRES_DB: ${POSTGRES_DB:-laundry_db}
+      POSTGRES_USER: ${POSTGRES_USER:-laundry_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-laundry_password}
     ports:
       - "5432:5432"
     volumes:
@@ -22,16 +23,31 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    platform: ${PLATFORM:-linux/amd64}
     container_name: laundry-backend
     ports:
       - "8080:8080"
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/laundry_db
-      SPRING_DATASOURCE_USERNAME: laundry_user
-      SPRING_DATASOURCE_PASSWORD: laundry_password
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-laundry_db}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-laundry_user}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-laundry_password}
     depends_on:
       postgres:
         condition: service_healthy
+    networks:
+      - laundry-network
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./laundry_app
+      dockerfile: Dockerfile
+    platform: ${FRONTEND_PLATFORM:-linux/amd64}
+    container_name: laundry-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
     networks:
       - laundry-network
     restart: unless-stopped

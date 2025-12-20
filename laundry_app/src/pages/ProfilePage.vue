@@ -118,11 +118,11 @@ const handleCancelBooking = async (bookingId: string) => {
       await loadUserBookings() // Перезагружаем список
     } else {
       error.value = data.message || 'Ошибка при отмене записи'
-      showError(error.value)
+      showError(error.value ?? 'Ошибка при отмене записи')
     }
   } catch (err) {
     error.value = 'Ошибка соединения с сервером'
-    showError(error.value)
+    showError(error.value ?? 'Ошибка соединения с сервером')
   } finally {
     isLoading.value = false
   }
@@ -262,7 +262,6 @@ const closeBookingModal = async () => {
 
     <BookingModal 
       :is-open="isBookingModalOpen" 
-      :edit-booking="editingBooking"
       @close="closeBookingModal" 
     />
   </div>
