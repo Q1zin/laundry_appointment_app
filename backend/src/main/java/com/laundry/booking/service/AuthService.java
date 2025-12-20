@@ -30,23 +30,23 @@ public class AuthService {
                 .orElse(null);
         
         if (user == null) {
-            return new LoginResponse(false, "User not found", null, null);
+            return new LoginResponse(false, "Пользователь не найден", null, null);
         }
 
         // Проверить блокировку
         if (user.isBlocked()) {
-            return new LoginResponse(false, "User is blocked", null, null);
+            return new LoginResponse(false, "Пользователь заблокирован", null, null);
         }
 
         // Шаг 2: Проверить пароль
         if (!verifyPassword(user, request.getPassword())) {
-            return new LoginResponse(false, "Invalid password", null, null);
+            return new LoginResponse(false, "Неверный пароль", null, null);
         }
 
         // Шаг 3: Сгенерировать JWT токен
         String token = jwtUtil.generateToken(user.getName(), user.getRole());
 
-        return new LoginResponse(true, "Login successful", token, user.getRole());
+        return new LoginResponse(true, "Вход выполнен успешно", token, user.getRole());
     }
 
     /**
@@ -55,7 +55,7 @@ public class AuthService {
     public LoginResponse register(String username, String password, String email, String fullName, String room, String contract) {
         // Проверка существования пользователя
         if (userRepository.findByName(username).isPresent()) {
-            return new LoginResponse(false, "Username already exists", null, null);
+            return new LoginResponse(false, "Пользователь с таким логином уже существует", null, null);
         }
 
         // Создание нового пользователя

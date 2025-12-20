@@ -43,7 +43,7 @@ public class BookingService {
 
         // Шаг 1.2: Проверка доступности слота
         if (!isSlotAvailable(machineId, slotId)) {
-            return new BookingResult(false, "Slot not available");
+            return new BookingResult(false, "Слот недоступен");
         }
 
         // Шаг 1.3: Повторная проверка лимита внутри транзакции (защита от race condition)
@@ -68,7 +68,7 @@ public class BookingService {
             timeslotRepository.save(slot);
         }
 
-        return new BookingResult(true, "Booking created successfully");
+        return new BookingResult(true, "Запись успешно создана");
     }
 
     /**
@@ -83,13 +83,13 @@ public class BookingService {
     public BookingResult cancelBooking(String bookingId, String userId) {
         // Шаг 1: Проверить права на отмену
         if (!canCancel(bookingId, userId)) {
-            return new BookingResult(false, "Cannot cancel this booking");
+            return new BookingResult(false, "Невозможно отменить эту запись");
         }
 
         // Шаг 2: Найти и отменить бронирование
         Booking booking = bookingRepository.findById(bookingId).orElse(null);
         if (booking == null) {
-            return new BookingResult(false, "Booking not found");
+            return new BookingResult(false, "Запись не найдена");
         }
 
         booking.setState("canceled");
@@ -102,7 +102,7 @@ public class BookingService {
             timeslotRepository.save(slot);
         }
 
-        return new BookingResult(true, "Booking canceled successfully");
+        return new BookingResult(true, "Запись успешно отменена");
     }
 
     /**
@@ -120,13 +120,13 @@ public class BookingService {
     public BookingResult rescheduleBooking(String bookingId, String newSlotId, String userId) {
         // Шаг 1: Проверить возможность переноса
         if (!canReschedule(bookingId, newSlotId, userId)) {
-            return new BookingResult(false, "Cannot reschedule this booking");
+            return new BookingResult(false, "Невозможно перенести эту запись");
         }
 
         // Шаг 2: Загрузить бронирование
         Booking booking = bookingRepository.findById(bookingId).orElse(null);
         if (booking == null) {
-            return new BookingResult(false, "Booking not found");
+            return new BookingResult(false, "Запись не найдена");
         }
 
         // Шаг 3: Получить ID старого слота
@@ -150,7 +150,7 @@ public class BookingService {
         booking.setSlot(newSlotId);
         bookingRepository.save(booking);
 
-        return new BookingResult(true, "Booking rescheduled successfully");
+        return new BookingResult(true, "Запись успешно перенесена");
     }
 
     /**

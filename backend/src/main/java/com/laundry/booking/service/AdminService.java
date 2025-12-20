@@ -65,7 +65,7 @@ public class AdminService {
     public BookingResult deleteMachine(String machineId) {
         Machine machine = machineRepository.findById(machineId).orElse(null);
         if (machine == null) {
-            return new BookingResult(false, "Machine not found");
+            return new BookingResult(false, "Машинка не найдена");
         }
 
         // Удаляем связи с расписаниями
@@ -74,26 +74,26 @@ public class AdminService {
         // Удаляем машинку (каскадно удалятся timeslots и bookings)
         machineRepository.delete(machine);
 
-        return new BookingResult(true, "Machine deleted successfully");
+        return new BookingResult(true, "Машинка успешно удалена");
     }
     @Transactional
     public BookingResult blockMachine(String machineId) {
         // Шаг 1: Найти машину
         Machine machine = machineRepository.findById(machineId).orElse(null);
         if (machine == null) {
-            return new BookingResult(false, "Machine not found");
+            return new BookingResult(false, "Машинка не найдена");
         }
 
         // Шаг 2: Проверить, не заблокирована ли уже
         if (machine.isAlreadyBlocked()) {
-            return new BookingResult(false, "Machine is already blocked");
+            return new BookingResult(false, "Машинка уже заблокирована");
         }
 
         // Шаг 3: Установить статус "blocked"
         machine.setStatus("blocked");
         machineRepository.save(machine);
 
-        return new BookingResult(true, "Machine blocked successfully");
+        return new BookingResult(true, "Машинка успешно заблокирована");
     }
 
     /**
@@ -108,14 +108,14 @@ public class AdminService {
         // Шаг 1: Найти машину
         Machine machine = machineRepository.findById(machineId).orElse(null);
         if (machine == null) {
-            return new BookingResult(false, "Machine not found");
+            return new BookingResult(false, "Машинка не найдена");
         }
 
         // Шаг 2: Установить статус "available"
         machine.setStatus("available");
         machineRepository.save(machine);
 
-        return new BookingResult(true, "Machine unblocked successfully");
+        return new BookingResult(true, "Машинка успешно разблокирована");
     }
 
     // ============= SCHEDULES =============
@@ -268,7 +268,7 @@ public class AdminService {
     public BookingResult deleteSchedule(String scheduleId) {
         Schedule schedule = scheduleRepository.findById(scheduleId).orElse(null);
         if (schedule == null) {
-            return new BookingResult(false, "Schedule not found");
+            return new BookingResult(false, "Расписание не найдено");
         }
 
         // Удаляем связи с машинками
@@ -277,7 +277,7 @@ public class AdminService {
         // Удаляем расписание
         scheduleRepository.delete(schedule);
 
-        return new BookingResult(true, "Schedule deleted successfully");
+        return new BookingResult(true, "Расписание успешно удалено");
     }
 
     // ============= BOOKINGS =============
@@ -290,7 +290,7 @@ public class AdminService {
         // Шаг 1: Найти бронирование
         Booking booking = bookingRepository.findById(bookingId).orElse(null);
         if (booking == null) {
-            return new BookingResult(false, "Booking not found");
+            return new BookingResult(false, "Запись не найдена");
         }
 
         // Шаг 2: Установить состояние "deleted"
@@ -304,7 +304,7 @@ public class AdminService {
             timeslotRepository.save(slot);
         }
 
-        return new BookingResult(true, "Booking deleted successfully");
+        return new BookingResult(true, "Запись успешно удалена");
     }
 
     /**
@@ -323,22 +323,22 @@ public class AdminService {
     public BookingResult blockUser(String userId) {
         User user = userRepository.findById(userId).orElse(null);
         if (user == null) {
-            return new BookingResult(false, "User not found");
+            return new BookingResult(false, "Пользователь не найден");
         }
 
         if (user.getIsBlocked()) {
-            return new BookingResult(false, "User is already blocked");
+            return new BookingResult(false, "Пользователь уже заблокирован");
         }
 
         // Нельзя блокировать админа
         if ("admin".equals(user.getRole())) {
-            return new BookingResult(false, "Cannot block admin user");
+            return new BookingResult(false, "Невозможно заблокировать администратора");
         }
 
         user.setIsBlocked(true);
         userRepository.save(user);
 
-        return new BookingResult(true, "User blocked successfully");
+        return new BookingResult(true, "Пользователь успешно заблокирован");
     }
 
     /**
@@ -349,17 +349,17 @@ public class AdminService {
     public BookingResult unblockUser(String userId) {
         User user = userRepository.findById(userId).orElse(null);
         if (user == null) {
-            return new BookingResult(false, "User not found");
+            return new BookingResult(false, "Пользователь не найден");
         }
 
         if (!user.getIsBlocked()) {
-            return new BookingResult(false, "User is not blocked");
+            return new BookingResult(false, "Пользователь не заблокирован");
         }
 
         user.setIsBlocked(false);
         userRepository.save(user);
 
-        return new BookingResult(true, "User unblocked successfully");
+        return new BookingResult(true, "Пользователь успешно разблокирован");
     }
 
     /**
