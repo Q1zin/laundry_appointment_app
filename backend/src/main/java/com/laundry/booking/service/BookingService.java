@@ -14,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -47,8 +48,9 @@ public class BookingService {
         }
 
         // Шаг 1.3: Повторная проверка лимита внутри транзакции (защита от race condition)
-        long activeBookings = bookingRepository.findByUserIdAndState(userId, "active").size();
-        if (activeBookings >= 2) {
+        // Считаем только будущие записи
+        long futureBookings = countFutureActiveBookings(userId);
+        if (futureBookings >= 2) {
             return new BookingResult(false, "Вы достигли лимита активных записей (максимум 2)");
         }
 
@@ -167,9 +169,26 @@ public class BookingService {
             return false;
         }
 
-        // Проверить количество активных бронирований
-        long activeBookings = bookingRepository.findByUserIdAndState(userId, "active").size();
-        return activeBookings < 2; // Максимум 2 активных бронирования
+        // Проверить количество будущих активных бронирований (прошедшие не считаются)
+        long futureBookings = countFutureActiveBookings(userId);
+        return futureBookings < 2; // Максимум 2 будущих бронирования
+    }
+
+    /**
+     * Подсчёт будущих активных бронирований пользователя
+     */
+    private long countFutureActiveBookings(String userId) {
+        List<Booking> activeBookings = bookingRepository.findByUserIdAndState(userId, "active");
+        LocalDateTime now = LocalDateTime.now();
+        
+        return activeBookings.stream()
+            .filter(booking -> {
+                Timeslot slot = timeslotRepository.findById(booking.getSlotId()).orElse(null);
+                if (slot == null) return false;
+                // Слот считается будущим, если его конец ещё не наступил
+                return slot.getEndTime() != null && slot.getEndTime().isAfter(now);
+            })
+            .count();
     }
 
     /**
@@ -244,6 +263,7 @@ public class BookingService {
 
     /**
      * Получить все активные записи пользователя с информацией о машинках и слотах
+     * Возвращает все записи (и будущие, и прошедшие)
      */
     public List<UserBookingDto> getUserBookings(String userId) {
         List<Booking> bookings = bookingRepository.findByUserIdAndState(userId, "active");
@@ -268,6 +288,10 @@ public class BookingService {
             if (slot != null) {
                 dto.setSlotStartTime(slot.getStartTime());
                 dto.setSlotEndTime(slot.getEndTime());
+                // Помечаем как прошедшую, если время окончания уже прошло
+                if (slot.getEndTime() != null && slot.getEndTime().isBefore(LocalDateTime.now())) {
+                    dto.setState("past");
+                }
             }
 
             result.add(dto);

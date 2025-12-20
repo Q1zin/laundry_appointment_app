@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import TheHeader from '@/components/layout/TheHeader.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -30,6 +30,16 @@ const isBookingModalOpen = ref(false)
 const isLoading = ref(false)
 const error = ref<string | null>(null)
 const userBookings = ref<UserBooking[]>([])
+const showPastBookings = ref(false)
+
+// Разделение записей на будущие и прошедшие
+const futureBookings = computed(() => 
+  userBookings.value.filter(b => b.state === 'active')
+)
+
+const pastBookings = computed(() => 
+  userBookings.value.filter(b => b.state === 'past')
+)
 
 // Загрузка записей пользователя
 const loadUserBookings = async () => {
@@ -195,7 +205,7 @@ const closeBookingModal = async () => {
           <div class="section-header-with-count">
             <h2 class="section-title">АКТИВНЫЕ ЗАПИСИ</h2>
             <div class="bookings-counter">
-              <span class="counter-text">{{ userBookings.length }} / 2</span>
+              <span class="counter-text">{{ futureBookings.length }} / 2</span>
               <span class="counter-label">записей</span>
             </div>
           </div>
@@ -209,7 +219,7 @@ const closeBookingModal = async () => {
             <BaseButton @click="loadUserBookings">Повторить попытку</BaseButton>
           </div>
           
-          <div v-else-if="userBookings.length === 0" class="no-bookings">
+          <div v-else-if="futureBookings.length === 0" class="no-bookings">
             <WashingMachineOutlineIcon :size="64" color="#9CA3AF" />
             <p>У вас пока нет активных записей на стирку</p>
             <BaseButton @click="openBookingModal">Записаться на стирку</BaseButton>
@@ -218,7 +228,7 @@ const closeBookingModal = async () => {
           <div v-else>
             <div class="bookings-list">
               <div 
-                v-for="booking in userBookings" 
+                v-for="booking in futureBookings" 
                 :key="booking.id" 
                 class="booking-card"
               >
@@ -247,10 +257,41 @@ const closeBookingModal = async () => {
           </div>
           
           <!-- Кнопка добавления записи, если меньше 2 -->
-          <div v-if="userBookings.length < 2" class="add-booking-section">
+          <div v-if="futureBookings.length < 2" class="add-booking-section">
             <BaseButton @click="openBookingModal">+ Добавить еще одну запись</BaseButton>
           </div>
         </div>
+        </section>
+
+        <!-- Прошедшие записи -->
+        <section v-if="pastBookings.length > 0" class="bookings-section past-bookings-section">
+          <button class="past-bookings-toggle" @click="showPastBookings = !showPastBookings">
+            <span class="toggle-title">ПРОШЕДШИЕ ЗАПИСИ ({{ pastBookings.length }})</span>
+            <span class="toggle-icon" :class="{ 'rotated': showPastBookings }">▼</span>
+          </button>
+          
+          <div v-if="showPastBookings" class="bookings-list past-bookings-list">
+            <div 
+              v-for="booking in pastBookings" 
+              :key="booking.id" 
+              class="booking-card past-booking-card"
+            >
+              <div class="booking-icon">
+                <WashingMachineOutlineIcon :size="40" color="#9CA3AF" />
+              </div>
+              <div class="booking-details">
+                <div class="booking-machine past-text">{{ booking.machineName }}</div>
+                <div class="booking-datetime past-text">
+                  <CalendarIcon :size="16" color="#9CA3AF" />
+                  <span>{{ formatDate(booking.slotStartTime) }}, {{ formatSlotTime(booking) }}</span>
+                </div>
+                <div class="booking-date past-text">Создано: {{ new Date(booking.createdAt).toLocaleString('ru-RU') }}</div>
+              </div>
+              <div class="booking-status">
+                <span class="past-badge">Завершено</span>
+              </div>
+            </div>
+          </div>
         </section>
 
         <!-- Действия аккаунта -->
@@ -586,6 +627,71 @@ const closeBookingModal = async () => {
 
 .delete-btn:hover {
   background: #FEE2E2;
+}
+
+/* Past Bookings Section */
+.past-bookings-section {
+  margin-top: 10px;
+}
+
+.past-bookings-toggle {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  background: #F3F4F6;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.past-bookings-toggle:hover {
+  background: #E5E7EB;
+}
+
+.toggle-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #6B7280;
+}
+
+.toggle-icon {
+  font-size: 12px;
+  color: #6B7280;
+  transition: transform 0.3s;
+}
+
+.toggle-icon.rotated {
+  transform: rotate(180deg);
+}
+
+.past-bookings-list {
+  margin-top: 15px;
+}
+
+.past-booking-card {
+  background: #F9FAFB;
+  border: 1px solid #E5E7EB;
+}
+
+.past-text {
+  color: #9CA3AF !important;
+}
+
+.booking-status {
+  display: flex;
+  align-items: center;
+}
+
+.past-badge {
+  background: #E5E7EB;
+  color: #6B7280;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
 }
 
 @media (max-width: 768px) {
