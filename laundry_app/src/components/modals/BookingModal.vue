@@ -247,10 +247,7 @@ const handleSubmit = async () => {
   isLoading.value = false
   
   if (result.success) {
-    bookingSuccess.value = true
-    setTimeout(() => {
-      closeModal()
-    }, 1500)
+    closeModal()
   } else {
     bookingError.value = result.message || 'Не удалось создать запись'
   }
@@ -282,11 +279,6 @@ const handleSubmit = async () => {
             {{ bookingError }}
           </div>
 
-          <!-- Success State -->
-          <div v-else-if="bookingSuccess" class="success-message">
-            ✓ Запись успешно создана!
-          </div>
-
           <!-- Main Form -->
           <template v-else>
             <!-- Machine Selection -->
@@ -303,7 +295,7 @@ const handleSubmit = async () => {
                   :class="{ active: selectedMachineId === machine.id }"
                   @click="selectedMachineId = machine.id; selectedSlotId = null"
                 >
-                  <WashingMachineOutlineIcon :size="80" color="#3D4F61" />
+                  <WashingMachineOutlineIcon :size="50" color="#3D4F61" />
                   <span class="machine-name">{{ machine.name.toUpperCase() }}</span>
                 </button>
               </div>
@@ -380,13 +372,13 @@ const handleSubmit = async () => {
 .modal-card {
   position: relative;
   width: 100%;
-  max-width: 700px;
+  max-width: 650px;
   max-height: 90vh;
   overflow-y: auto;
   background-color: #FFFFFF;
-  border-radius: 20px;
+  border-radius: 16px;
   box-shadow: 0 15px 50px rgba(0, 0, 0, 0.1);
-  padding: 40px 50px;
+  padding: 25px 30px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -409,10 +401,10 @@ const handleSubmit = async () => {
 }
 
 .modal-title {
-  font-size: 28px;
+  font-size: 22px;
   font-weight: bold;
   color: #3D4F61;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
   text-align: center;
 }
 
@@ -420,44 +412,44 @@ const handleSubmit = async () => {
   width: 100%;
   height: 1px;
   background-color: #E0E0E0;
-  margin-bottom: 30px;
+  margin-bottom: 20px;
 }
 
 .section {
   width: 100%;
-  margin-bottom: 30px;
+  margin-bottom: 20px;
 }
 
 .section-title {
-  font-size: 18px;
+  font-size: 15px;
   font-weight: bold;
   color: #3D4F61;
-  margin-bottom: 25px;
-  margin-top: 20px;
+  margin-bottom: 15px;
+  margin-top: 10px;
 }
 
 /* Machines */
 .machines-grid {
   display: flex;
-  gap: 25px;
+  gap: 12px;
   justify-content: center;
   flex-wrap: wrap;
 }
 
 .machine-card {
-  width: 180px;
-  height: 180px;
-  border-radius: 20px;
+  width: 120px;
+  height: 120px;
+  border-radius: 12px;
   border: 2px solid #E8EEF2;
   background: #FFFFFF;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 15px;
+  gap: 8px;
   cursor: pointer;
   transition: all 0.3s ease;
-  padding: 30px 40px;
+  padding: 15px 20px;
 }
 
 .machine-card:hover {
@@ -469,7 +461,7 @@ const handleSubmit = async () => {
 }
 
 .machine-name {
-  font-size: 16px;
+  font-size: 13px;
   font-weight: 500;
   color: #3D4F61;
   text-align: center;
@@ -478,22 +470,22 @@ const handleSubmit = async () => {
 /* Dates */
 .dates-grid {
   display: flex;
-  gap: 12px;
+  gap: 8px;
   justify-content: center;
   flex-wrap: wrap;
 }
 
 .date-btn {
-  width: 80px;
-  height: 80px;
-  border-radius: 15px;
+  width: 60px;
+  height: 60px;
+  border-radius: 10px;
   border: 2px solid #E8EEF2;
   background: #FFFFFF;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 2px;
   cursor: pointer;
   transition: all 0.3s ease;
 }
@@ -509,12 +501,12 @@ const handleSubmit = async () => {
 }
 
 .date-day {
-  font-size: 16px;
+  font-size: 11px;
   color: #3D4F61;
 }
 
 .date-num {
-  font-size: 20px;
+  font-size: 16px;
   font-weight: bold;
   color: #3D4F61;
 }
@@ -527,17 +519,17 @@ const handleSubmit = async () => {
 /* Times */
 .times-grid {
   display: flex;
-  gap: 20px;
+  gap: 10px;
   justify-content: center;
   flex-wrap: wrap;
 }
 
 .time-btn {
-  padding: 15px 35px;
-  border-radius: 25px;
+  padding: 10px 20px;
+  border-radius: 20px;
   border: 2px solid #E8EEF2;
   background: #FFFFFF;
-  font-size: 16px;
+  font-size: 13px;
   color: #3D4F61;
   cursor: pointer;
   transition: all 0.3s ease;
