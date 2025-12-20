@@ -185,7 +185,13 @@ const closeBookingModal = async () => {
 
         <!-- Активные записи -->
         <section class="bookings-section">
-          <h2 class="section-title">АКТИВНЫЕ ЗАПИСИ</h2>
+          <div class="section-header-with-count">
+            <h2 class="section-title">АКТИВНЫЕ ЗАПИСИ</h2>
+            <div class="bookings-counter">
+              <span class="counter-text">{{ userBookings.length }} / 2</span>
+              <span class="counter-label">записей</span>
+            </div>
+          </div>
           
           <div v-if="isLoading" class="loading-state">
             <p>Загрузка записей...</p>
@@ -202,12 +208,13 @@ const closeBookingModal = async () => {
             <BaseButton @click="openBookingModal">Записаться на стирку</BaseButton>
           </div>
           
-          <div v-else class="bookings-list">
-            <div 
-              v-for="booking in userBookings" 
-              :key="booking.id" 
-              class="booking-card"
-            >
+          <div v-else>
+            <div class="bookings-list">
+              <div 
+                v-for="booking in userBookings" 
+                :key="booking.id" 
+                class="booking-card"
+              >
               <div class="booking-icon">
                 <WashingMachineOutlineIcon :size="40" color="#3D4F61" />
               </div>
@@ -231,6 +238,12 @@ const closeBookingModal = async () => {
               </div>
             </div>
           </div>
+          
+          <!-- Кнопка добавления записи, если меньше 2 -->
+          <div v-if="userBookings.length < 2" class="add-booking-section">
+            <BaseButton @click="openBookingModal">+ Добавить еще одну запись</BaseButton>
+          </div>
+        </div>
         </section>
 
         <!-- Действия аккаунта -->
@@ -322,6 +335,34 @@ const closeBookingModal = async () => {
   margin-bottom: 50px;
 }
 
+.section-header-with-count {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 25px;
+}
+
+.bookings-counter {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  background: #E8EEF2;
+  padding: 10px 20px;
+  border-radius: 12px;
+}
+
+.counter-text {
+  font-size: 24px;
+  font-weight: bold;
+  color: #3D4F61;
+}
+
+.counter-label {
+  font-size: 12px;
+  color: #6B7280;
+  text-transform: uppercase;
+}
+
 .loading-state,
 .error-state,
 .no-bookings {
@@ -359,6 +400,12 @@ const closeBookingModal = async () => {
   display: flex;
   flex-direction: column;
   gap: 15px;
+}
+
+.add-booking-section {
+  margin-top: 20px;
+  display: flex;
+  justify-content: center;
 }
 
 .booking-card {

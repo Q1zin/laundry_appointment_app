@@ -38,12 +38,18 @@ public class BookingService {
     public BookingResult createBooking(String userId, String machineId, String slotId) {
         // Шаг 1.1: Проверка прав пользователя
         if (!canUserBook(userId)) {
-            return new BookingResult(false, "User cannot book");
+            return new BookingResult(false, "Вы достигли лимита активных записей (максимум 2)");
         }
 
         // Шаг 1.2: Проверка доступности слота
         if (!isSlotAvailable(machineId, slotId)) {
             return new BookingResult(false, "Slot not available");
+        }
+
+        // Шаг 1.3: Повторная проверка лимита внутри транзакции (защита от race condition)
+        long activeBookings = bookingRepository.findByUserIdAndState(userId, "active").size();
+        if (activeBookings >= 2) {
+            return new BookingResult(false, "Вы достигли лимита активных записей (максимум 2)");
         }
 
         // Шаг 2: Создание бронирования
@@ -163,7 +169,7 @@ public class BookingService {
 
         // Проверить количество активных бронирований
         long activeBookings = bookingRepository.findByUserIdAndState(userId, "active").size();
-        return activeBookings < 3; // Максимум 3 активных бронирования
+        return activeBookings < 2; // Максимум 2 активных бронирования
     }
 
     /**

@@ -28,13 +28,13 @@ const { login, register } = useAuth()
 type AuthMode = 'login' | 'register'
 const mode = ref<AuthMode>('login')
 
-// Login form
+
 const loginUsername = ref('')
 const loginPassword = ref('')
 const loginError = ref('')
 const isLoginLoading = ref(false)
 
-// Register form
+
 const regUsername = ref('')
 const regEmail = ref('')
 const regFullName = ref('')
@@ -45,13 +45,13 @@ const regPasswordConfirm = ref('')
 const regError = ref('')
 const isRegLoading = ref(false)
 
-// Очищаем ошибки при смене режима
+
 watch(mode, () => {
   loginError.value = ''
   regError.value = ''
 })
 
-// Очищаем ошибку входа при изменении полей
+
 watch([loginUsername, loginPassword], () => {
   loginError.value = ''
 })
@@ -83,13 +83,13 @@ const handleLogin = async () => {
     const result = await login(loginUsername.value, loginPassword.value)
     
     if (result.success) {
-      // Успешный вход
+      
       loginUsername.value = ''
       loginPassword.value = ''
       emit('success')
       closeModal()
     } else {
-      // Ошибка аутентификации
+      
       loginError.value = result.message || 'Неверный логин или пароль'
     }
   } catch (error) {
@@ -100,20 +100,20 @@ const handleLogin = async () => {
 }
 
 const handleRegister = async () => {
-  // Валидация обязательных полей
+  
   if (!regUsername.value || !regEmail.value || !regFullName.value || !regRoom.value || !regContract.value) {
     regError.value = 'Заполните все обязательные поля'
     return
   }
   
-  // Валидация комнаты (3 цифры + М/Б)
+  
   const roomPattern = /^\d{3}[МБмб]$/
   if (!roomPattern.test(regRoom.value)) {
     regError.value = 'Комната должна быть в формате: 3 цифры + М или Б (например, 107М)'
     return
   }
   
-  // Валидация договора (ОБ5-****)
+  
   const contractPattern = /^ОБ5-\d{4}$/i
   if (!contractPattern.test(regContract.value)) {
     regError.value = 'Договор должен быть в формате: ОБ5-**** (например, ОБ5-1234)'
@@ -144,7 +144,7 @@ const handleRegister = async () => {
     })
     
     if (result.success) {
-      // Успешная регистрация - автоматический вход
+      
       regUsername.value = ''
       regEmail.value = ''
       regFullName.value = ''
