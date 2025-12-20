@@ -8,6 +8,7 @@ import WashingMachineOutlineIcon from '@/components/icons/WashingMachineOutlineI
 import CalendarIcon from '@/components/icons/CalendarIcon.vue'
 import TrashIcon from '@/components/icons/TrashIcon.vue'
 import { useAuth } from '@/composables/useAuth'
+import { useToast } from '@/composables/useToast'
 
 // Тип для записи пользователя (от нового эндпоинта)
 interface UserBooking {
@@ -23,6 +24,7 @@ interface UserBooking {
 
 const router = useRouter()
 const { isLoggedIn, user, logout } = useAuth()
+const { success, error: showError, confirm } = useToast()
 
 const isBookingModalOpen = ref(false)
 const isLoading = ref(false)
@@ -91,7 +93,8 @@ onMounted(async () => {
 const handleCancelBooking = async (bookingId: string) => {
   if (!user.value?.id) return
   
-  if (!confirm('Вы уверены, что хотите отменить эту запись?')) return
+  const confirmed = await confirm('Вы уверены, что хотите отменить эту запись?')
+  if (!confirmed) return
   
   isLoading.value = true
   error.value = null
@@ -111,15 +114,15 @@ const handleCancelBooking = async (bookingId: string) => {
     const data = await response.json()
     
     if (data.result) {
-      alert('Запись успешно отменена')
+      success('Запись успешно отменена')
       await loadUserBookings() // Перезагружаем список
     } else {
       error.value = data.message || 'Ошибка при отмене записи'
-      alert(error.value)
+      showError(error.value)
     }
   } catch (err) {
     error.value = 'Ошибка соединения с сервером'
-    alert(error.value)
+    showError(error.value)
   } finally {
     isLoading.value = false
   }

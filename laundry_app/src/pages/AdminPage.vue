@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
+import { useToast } from '@/composables/useToast'
 import { useMachines } from '@/composables/useMachines'
 import { useSchedule, type Machine } from '@/composables/useSchedule'
 import { useAdminBookings } from '@/composables/useAdminBookings'
@@ -59,6 +60,7 @@ interface AdminSchedule {
 
 const router = useRouter()
 const { isLoggedIn, isAdmin, user } = useAuth()
+const { confirm } = useToast()
 
 // Редирект если не админ
 onMounted(() => {
@@ -264,7 +266,8 @@ const loadAllBookings = async () => {
 
 // Обработчики машинок
 const handleBlockMachine = async (machineId: string) => {
-  if (!confirm('Заблокировать эту машинку?')) return
+  const confirmed = await confirm('Заблокировать эту машинку?')
+  if (!confirmed) return
   
   isLoading.value = true
   actionError.value = null
@@ -283,7 +286,8 @@ const handleBlockMachine = async (machineId: string) => {
 }
 
 const handleUnblockMachine = async (machineId: string) => {
-  if (!confirm('Разблокировать эту машинку?')) return
+  const confirmed = await confirm('Разблокировать эту машинку?')
+  if (!confirmed) return
   
   isLoading.value = true
   actionError.value = null
@@ -336,7 +340,8 @@ const handleAddMachine = async () => {
 
 // Удаление машинки
 const handleDeleteMachine = async (machineId: string) => {
-  if (!confirm('Удалить эту машинку? Все связанные записи будут также удалены.')) return
+  const confirmed = await confirm('Удалить эту машинку? Все связанные записи будут также удалены.')
+  if (!confirmed) return
   
   isLoading.value = true
   actionError.value = null
@@ -459,7 +464,8 @@ const handleSaveSchedule = async () => {
 }
 
 const handleDeleteSchedule = async (scheduleId: string) => {
-  if (!confirm('Удалить это расписание?')) return
+  const confirmed = await confirm('Удалить это расписание?')
+  if (!confirmed) return
   
   isLoading.value = true
   actionError.value = null
@@ -492,7 +498,8 @@ const getMachineName = (machineId: string) => {
 }
 
 const handleDeleteBooking = async (bookingId: string) => {
-  if (!confirm('Отменить эту запись?')) return
+  const confirmed = await confirm('Отменить эту запись?')
+  if (!confirmed) return
   
   isLoading.value = true
   actionError.value = null
@@ -553,7 +560,8 @@ const getBookingStatus = (state: string) => {
 
 // Блокировка пользователя
 const handleBlockUser = async (userId: string) => {
-  if (!confirm('Заблокировать этого пользователя?')) return
+  const confirmed = await confirm('Заблокировать этого пользователя?')
+  if (!confirmed) return
   
   isLoading.value = true
   actionError.value = null
@@ -583,7 +591,8 @@ const handleBlockUser = async (userId: string) => {
 
 // Разблокировка пользователя
 const handleUnblockUser = async (userId: string) => {
-  if (!confirm('Разблокировать этого пользователя?')) return
+  const confirmed = await confirm('Разблокировать этого пользователя?')
+  if (!confirmed) return
   
   isLoading.value = true
   actionError.value = null
