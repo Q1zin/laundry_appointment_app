@@ -5,6 +5,7 @@ import { useAuth } from '@/composables/useAuth'
 import { useBookings } from '@/composables/useBookings'
 import { useSchedule, type Machine, type Timeslot, type Booking } from '@/composables/useSchedule'
 import { useBodyScrollLock } from '@/composables/useBodyScrollLock'
+import { toLocalISODate } from '@/utils/date'
 
 const props = defineProps<{
   isOpen: boolean
@@ -28,13 +29,13 @@ const isLoading = ref(false)
 const bookingError = ref<string | null>(null)
 const bookingSuccess = ref(false)
 
-// Schedule data
-const machines = ref<Machine[]>([])
-const timeslots = ref<Timeslot[]>([])
-const bookings = ref<Booking[]>([])
-
-// Расписания для всех дат (для фильтрации доступных дат по машинке)
-const schedulesMap = ref<Map<string, { timeslots: Timeslot[], bookings: Booking[] }>>(new Map())
+// Расписания для всех дат: date → { machines, timeslots, bookings }
+interface ScheduleEntry {
+  machines: Machine[]
+  timeslots: Timeslot[]
+  bookings: Booking[]
+}
+const schedulesMap = ref<Map<string, ScheduleEntry>>(new Map())
 
 // Генерация дат на 7 дней вперед
 interface DateOption {
@@ -53,7 +54,7 @@ const allDates = computed<DateOption[]>(() => {
     date.setDate(date.getDate() + i)
     
     dates.push({
-      date: date.toISOString().split('T')[0]!,
+      date: toLocalISODate(date),
       dayName: dayNames[date.getDay()]!,
       dayNum: date.getDate()
     })
@@ -62,13 +63,34 @@ const allDates = computed<DateOption[]>(() => {
   return dates
 })
 
+// Уникальные машинки со ВСЕХ дат (объединение)
+const availableMachines = computed<Machine[]>(() => {
+  const machineMap = new Map<string, Machine>()
+  
+  for (const entry of schedulesMap.value.values()) {
+    for (const machine of entry.machines) {
+      // Берём только доступные (не заблокированные)
+      if (machine.status === 'available' || !machine.alreadyBlocked) {
+        machineMap.set(machine.id, machine)
+      }
+    }
+  }
+  
+  // Сортируем по имени для стабильности UI
+  return Array.from(machineMap.values()).sort((a, b) => a.name.localeCompare(b.name))
+})
+
 // Доступные даты для выбранной машинки (только те, где есть свободные слоты)
 const availableDates = computed<DateOption[]>(() => {
-  if (!selectedMachineId.value) return allDates.value
+  if (!selectedMachineId.value) return []
   
   return allDates.value.filter(dateOption => {
     const schedule = schedulesMap.value.get(dateOption.date)
     if (!schedule) return false
+    
+    // Проверяем, есть ли эта машинка в расписании этой даты
+    const machineExists = schedule.machines.some(m => m.id === selectedMachineId.value)
+    if (!machineExists) return false
     
     // Получаем занятые слоты для выбранной машинки
     const occupiedSlotIds = schedule.bookings
@@ -85,48 +107,62 @@ const availableDates = computed<DateOption[]>(() => {
   })
 })
 
-// Загрузка расписаний для всех дат при выборе машинки
-watch(selectedMachineId, async (newMachineId) => {
-  if (!newMachineId || !user.value?.id) return
+// Доступные слоты для выбранной машинки и даты (из schedulesMap)
+const availableSlots = computed<Timeslot[]>(() => {
+  if (!selectedMachineId.value || !selectedDate.value) return []
   
-  // Загружаем расписания для всех 7 дней
+  const schedule = schedulesMap.value.get(selectedDate.value)
+  if (!schedule) return []
+  
+  // Получаем занятые слоты для выбранной машинки
+  const occupiedSlotIds = schedule.bookings
+    .filter(b => b.machineId === selectedMachineId.value && b.state === 'active')
+    .map(b => b.slotId)
+  
+  // Фильтруем слоты: только для выбранной машинки и не занятые
+  return schedule.timeslots.filter(
+    slot => slot.machineId === selectedMachineId.value && 
+            !occupiedSlotIds.includes(slot.slotId)
+  )
+})
+
+// Загрузка расписаний для ВСЕХ 7 дней при открытии модалки
+const loadAllSchedules = async () => {
+  if (!user.value?.id) return
+  
+  isLoading.value = true
+  bookingError.value = null
   schedulesMap.value.clear()
   
-  const promises = allDates.value.map(async (dateOption) => {
-    const result = await fetchSchedule(dateOption.date, String(user.value!.id))
-    if (result.success && result.data) {
-      schedulesMap.value.set(dateOption.date, {
-        timeslots: result.data.timeslots,
-        bookings: result.data.bookings || []
-      })
-    }
-  })
-  
-  await Promise.all(promises)
-  
-  // Сбрасываем выбор даты и слота
+  try {
+    const promises = allDates.value.map(async (dateOption) => {
+      const result = await fetchSchedule(dateOption.date, String(user.value!.id))
+      if (result.success && result.data) {
+        schedulesMap.value.set(dateOption.date, {
+          machines: result.data.machines,
+          timeslots: result.data.timeslots,
+          bookings: result.data.bookings || []
+        })
+      }
+    })
+    
+    await Promise.all(promises)
+  } catch (err) {
+    bookingError.value = 'Не удалось загрузить расписание'
+  } finally {
+    isLoading.value = false
+  }
+}
+
+// При выборе машинки — сбрасываем дату и слот
+watch(selectedMachineId, () => {
   selectedDate.value = ''
   selectedSlotId.value = null
 })
 
-// Загрузка расписания при смене даты
-watch(selectedDate, async (newDate) => {
-  if (!newDate || !user.value?.id) return
-  
-  isLoading.value = true
-  bookingError.value = null
-  
-  const result = await fetchSchedule(newDate, String(user.value.id))
-  
-  if (result.success && result.data) {
-    machines.value = result.data.machines
-    timeslots.value = result.data.timeslots
-    bookings.value = result.data.bookings || []
-  } else {
-    bookingError.value = result.error || 'Не удалось загрузить расписание'
-  }
-  
-  isLoading.value = false
+// При выборе даты — сбрасываем слот
+watch(selectedDate, () => {
+  selectedSlotId.value = null
 })
 
 // Инициализация при открытии
@@ -138,44 +174,11 @@ watch(() => props.isOpen, async (isOpen) => {
     selectedSlotId.value = null
     bookingSuccess.value = false
     bookingError.value = null
-    schedulesMap.value.clear()
     
-    // Загружаем начальные данные машинок (для текущей даты)
-    if (user.value?.id) {
-      isLoading.value = true
-      const today = new Date().toISOString().split('T')[0]!
-      const result = await fetchSchedule(today, String(user.value.id))
-      
-      if (result.success && result.data) {
-        machines.value = result.data.machines
-        timeslots.value = result.data.timeslots
-        bookings.value = result.data.bookings || []
-      }
-      isLoading.value = false
-    }
+    // Загружаем расписания для ВСЕХ 7 дней
+    await loadAllSchedules()
   }
 }, { immediate: true })
-
-// Доступные машинки (не заблокированные)
-const availableMachines = computed(() => {
-  return machines.value.filter(m => m.status === 'available' || !m.alreadyBlocked)
-})
-
-// Доступные слоты для выбранной машинки и даты
-const availableSlots = computed(() => {
-  if (!selectedMachineId.value || !selectedDate.value) return []
-  
-  // Получаем занятые слоты для выбранной машинки
-  const occupiedSlotIds = bookings.value
-    .filter(b => b.machineId === selectedMachineId.value && b.state === 'active')
-    .map(b => b.slotId)
-  
-  // Фильтруем слоты: только для выбранной машинки и не занятые
-  return timeslots.value.filter(
-    slot => slot.machineId === selectedMachineId.value && 
-            !occupiedSlotIds.includes(slot.slotId)
-  )
-})
 
 // Форматирование времени из ISO в HH:MM
 // Важно: сервер возвращает время без timezone (LocalDateTime),

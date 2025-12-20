@@ -160,11 +160,16 @@ public class AdminService {
                     return newSchedule;
                 });
 
-        schedule.setIsOpen(request.getIsOpen());
-        schedule = scheduleRepository.save(schedule);
-
-        // Удаляем старые связи с машинками
+        // Сначала сохраняем schedule, чтобы получить id (для нового)
+        schedule = scheduleRepository.saveAndFlush(schedule);
+        
+        // Удаляем старые связи с машинками (clearAutomatically очистит контекст)
         scheduleMachineRepository.deleteByScheduleId(schedule.getId());
+        
+        // ПОСЛЕ очистки контекста — заново загружаем schedule и обновляем isOpen
+        schedule = scheduleRepository.findById(schedule.getId()).orElseThrow();
+        schedule.setIsOpen(request.getIsOpen());
+        schedule = scheduleRepository.saveAndFlush(schedule);
 
         // Создаём новые связи
         if (request.getMachineIds() != null) {
@@ -177,7 +182,7 @@ public class AdminService {
         }
 
         // Создаём или обновляем временные слоты для выбранных машинок и времени
-        if (request.getIsOpen() && request.getMachineIds() != null && !request.getMachineIds().isEmpty()) {
+        if (Boolean.TRUE.equals(request.getIsOpen()) && request.getMachineIds() != null && !request.getMachineIds().isEmpty()) {
             // Если временные слоты указаны, используем их, иначе - все по умолчанию
             if (request.getTimeSlots() != null && !request.getTimeSlots().isEmpty()) {
                 createTimeslotsForDate(request.getDate(), request.getMachineIds(), request.getTimeSlots());

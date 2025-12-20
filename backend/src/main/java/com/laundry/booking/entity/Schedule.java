@@ -29,13 +29,4 @@ public class Schedule {
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
-
-    // Business methods
-    public Boolean isOpen() {
-        return this.isOpen;
-    }
-
-    public void setIsOpen(Boolean isOpen) {
-        this.isOpen = isOpen;
-    }
 }

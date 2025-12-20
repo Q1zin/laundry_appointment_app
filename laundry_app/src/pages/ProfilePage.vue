@@ -10,6 +10,7 @@ import TrashIcon from '@/components/icons/TrashIcon.vue'
 import EditIcon from '@/components/icons/EditIcon.vue'
 import { useAuth } from '@/composables/useAuth'
 import { useSchedule, type Booking as ScheduleBooking, type Machine, type Timeslot } from '@/composables/useSchedule'
+import { toLocalISODate } from '@/utils/date'
 
 const router = useRouter()
 const { isLoggedIn, user, logout } = useAuth()
@@ -29,7 +30,7 @@ const loadUserBookings = async () => {
   isLoading.value = true
   error.value = null
   
-  const today = new Date().toISOString().split('T')[0] || ''
+  const today = toLocalISODate(new Date())
   const result = await fetchSchedule(today, String(user.value.id))
   
   if (result.success && result.data) {

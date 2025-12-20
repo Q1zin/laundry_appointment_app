@@ -13,6 +13,7 @@ import LockIcon from '@/components/icons/LockIcon.vue'
 import EditIcon from '@/components/icons/EditIcon.vue'
 import TheHeader from '@/components/layout/TheHeader.vue'
 import BookingModal from '@/components/modals/BookingModal.vue'
+import { toLocalISODate } from '@/utils/date'
 
 interface AdminUser {
   id: string
@@ -123,8 +124,7 @@ const { deleteBooking } = useAdminBookings()
 onMounted(async () => {
   if (!user.value?.id) return
   
-  const today = new Date().toISOString().split('T')[0]
-  selectedDate.value = today || ''
+  selectedDate.value = toLocalISODate(new Date())
   
   await loadAllData()
 })
@@ -303,7 +303,7 @@ const openScheduleForm = (schedule?: AdminSchedule) => {
     const tomorrow = new Date()
     tomorrow.setDate(tomorrow.getDate() + 1)
     scheduleForm.value = {
-      date: tomorrow.toISOString().split('T')[0] || '',
+      date: toLocalISODate(tomorrow),
       isOpen: true,
       machineIds: [],
       timeSlots: [...availableTimeSlots] // По умолчанию все слоты
@@ -339,6 +339,9 @@ const handleSaveSchedule = async () => {
   isLoading.value = true
   actionError.value = null
   actionSuccess.value = null
+  
+  console.log('=== handleSaveSchedule ===')
+  console.log('scheduleForm.value =', JSON.parse(JSON.stringify(scheduleForm.value)))
   
   try {
     const response = await fetch('/api/admin/schedules', {
