@@ -68,10 +68,28 @@ onMounted(() => {
 })
 
 // Состояние
-const activeTab = ref<'machines' | 'schedules' | 'users' | 'bookings'>('machines')
+const activeTab = ref<'machines' | 'schedules' | 'users' | 'bookings' | 'calendar'>('machines')
 const isLoading = ref(false)
 const actionError = ref<string | null>(null)
 const actionSuccess = ref<string | null>(null)
+
+// Календарь
+interface CalendarSlot {
+  slotId: string
+  startTime: string
+  endTime: string
+  isBooked: boolean
+  booking?: AdminBooking
+}
+
+interface CalendarDay {
+  date: string
+  dayName: string
+  dayNum: number
+  machines: Map<string, CalendarSlot[]>
+}
+
+const calendarDays = ref<CalendarDay[]>([])
 
 // Модальные окна
 const isBookingModalOpen = ref(false)
@@ -137,7 +155,63 @@ const loadAllData = async () => {
     loadUsers(),
     loadAllBookings()
   ])
+  await loadCalendarData()
   isLoading.value = false
+}
+
+// Загрузка данных календаря на 7 дней вперед
+const loadCalendarData = async () => {
+  const days: CalendarDay[] = []
+  const dayNames = ['ВС', 'ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ']
+  
+  for (let i = 0; i < 7; i++) {
+    const date = new Date()
+    date.setDate(date.getDate() + i)
+    const dateStr = toLocalISODate(date)
+    
+    const result = await fetchSchedule(dateStr, 'admin')
+    
+    if (result.success && result.data) {
+      const machines = new Map<string, CalendarSlot[]>()
+      
+      // Группируем слоты по машинкам
+      result.data.machines.forEach(machine => {
+        const machineSlots: CalendarSlot[] = []
+        
+        result.data!.timeslots
+          .filter(slot => slot.machineId === machine.id)
+          .forEach(slot => {
+            const booking = result.data!.bookings?.find(
+              b => b.slotId === slot.slotId && b.state === 'active'
+            )
+            
+            machineSlots.push({
+              slotId: slot.slotId,
+              startTime: slot.startTime,
+              endTime: slot.endTime,
+              isBooked: !!booking,
+              booking: booking as AdminBooking | undefined
+            })
+          })
+        
+        // Сортируем по времени начала
+        machineSlots.sort((a, b) => a.startTime.localeCompare(b.startTime))
+        
+        if (machineSlots.length > 0) {
+          machines.set(machine.id, machineSlots)
+        }
+      })
+      
+      days.push({
+        date: dateStr,
+        dayName: dayNames[date.getDay()],
+        dayNum: date.getDate(),
+        machines
+      })
+    }
+  }
+  
+  calendarDays.value = days
 }
 
 // Загрузка машинок
@@ -610,6 +684,14 @@ const scrollToRules = () => {
             <EditIcon :size="20" :color="activeTab === 'bookings' ? '#fff' : '#3D4F61'" />
             Записи
           </button>
+          <button 
+            class="tab-btn" 
+            :class="{ active: activeTab === 'calendar' }"
+            @click="activeTab = 'calendar'"
+          >
+            <CalendarIcon :size="20" :color="activeTab === 'calendar' ? '#fff' : '#3D4F61'" />
+            Календарь
+          </button>
         </div>
 
         <!-- Machines Management -->
@@ -909,6 +991,53 @@ const scrollToRules = () => {
                 >
                   Разблокировать
                 </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Calendar View -->
+        <section v-if="!isLoading && activeTab === 'calendar'" class="section calendar-section">
+          <h2 class="section-title">КАЛЕНДАРЬ ЗАПИСЕЙ</h2>
+          
+          <div v-if="calendarDays.length === 0" class="no-data">
+            Нет данных расписания
+          </div>
+          
+          <div v-else class="calendar-grid">
+            <div 
+              v-for="day in calendarDays" 
+              :key="day.date"
+              class="calendar-day"
+            >
+              <div class="day-header">
+                <span class="day-name">{{ day.dayName }}</span>
+                <span class="day-number">{{ day.dayNum }}</span>
+              </div>
+              
+              <div class="day-machines">
+                <div 
+                  v-for="[machineId, slots] of day.machines"
+                  :key="machineId"
+                  class="machine-slots"
+                >
+                  <div class="machine-label">
+                    {{ adminMachines.find(m => m.id === machineId)?.name || 'Машинка' }}
+                  </div>
+                  
+                  <div class="slots-list">
+                    <div 
+                      v-for="slot in slots"
+                      :key="slot.slotId"
+                      class="slot-item"
+                      :class="{ booked: slot.isBooked, free: !slot.isBooked }"
+                      :title="slot.isBooked ? `Занято: ${slot.booking?.userFullName || slot.booking?.userName}` : 'Свободно'"
+                    >
+                      <span class="slot-time">{{ formatTime(slot.startTime) }}</span>
+                      <span v-if="slot.isBooked" class="slot-user">{{ slot.booking?.userFullName || slot.booking?.userName }}</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -1720,5 +1849,137 @@ const scrollToRules = () => {
 /* Machine actions flex direction */
 .machine-actions {
   flex-direction: column;
+}
+
+/* Calendar Section */
+.calendar-section {
+  padding: 0;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+  padding: 20px 0;
+}
+
+.calendar-day {
+  background: #FFFFFF;
+  border-radius: 16px;
+  padding: 15px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.06);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.calendar-day:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+}
+
+.day-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-bottom: 15px;
+  margin-bottom: 15px;
+  border-bottom: 2px solid #E8EEF2;
+}
+
+.day-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #6B7280;
+  text-transform: uppercase;
+}
+
+.day-number {
+  font-size: 28px;
+  font-weight: bold;
+  color: #3D4F61;
+  margin-top: 5px;
+}
+
+.day-machines {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.machine-slots {
+  background: #F9FAFB;
+  border-radius: 10px;
+  padding: 10px;
+}
+
+.machine-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #3D4F61;
+  margin-bottom: 8px;
+  padding: 0 5px;
+}
+
+.slots-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.slot-item {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  transition: all 0.2s;
+  cursor: pointer;
+}
+
+.slot-item.free {
+  background: #D1FAE5;
+  border: 1px solid #A7F3D0;
+  color: #065F46;
+}
+
+.slot-item.free:hover {
+  background: #A7F3D0;
+  border-color: #6EE7B7;
+}
+
+.slot-item.booked {
+  background: #FEE2E2;
+  border: 1px solid #FECACA;
+  color: #991B1B;
+}
+
+.slot-item.booked:hover {
+  background: #FECACA;
+  border-color: #FCA5A5;
+}
+
+.slot-time {
+  font-weight: 600;
+  font-size: 11px;
+}
+
+.slot-user {
+  font-size: 10px;
+  margin-top: 3px;
+  opacity: 0.8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 1200px) {
+  .calendar-grid {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .calendar-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
