@@ -23,7 +23,7 @@ interface UserBooking {
 }
 
 const router = useRouter()
-const { isLoggedIn, user, logout } = useAuth()
+const { isLoggedIn, user, logout, isAdmin } = useAuth()
 const { success, error: showError, confirm } = useToast()
 
 const isBookingModalOpen = ref(false)
@@ -131,6 +131,10 @@ const handleCancelBooking = async (bookingId: string) => {
 const handleLogout = () => {
   logout()
   router.push('/')
+}
+
+const goToAdmin = () => {
+  router.push('/admin')
 }
 
 const openBookingModal = () => {
@@ -251,6 +255,11 @@ const closeBookingModal = async () => {
 
         <!-- Действия аккаунта -->
         <section class="account-section">
+          <div v-if="isAdmin" class="admin-section">
+            <button class="action-btn admin-btn" @click="goToAdmin">
+              ПЕРЕЙТИ В АДМИН-ПАНЕЛЬ
+            </button>
+          </div>
           <div class="logout-section">
             <button class="action-btn logout-btn" @click="handleLogout">
               ВЫЙТИ ИЗ АККАУНТА
@@ -508,12 +517,15 @@ const closeBookingModal = async () => {
 .account-section {
   margin-bottom: 30px;
   padding: 0 25px;
-  /* background: #d0ccff; */
   border-radius: 16px;
   display: flex;
-  /* align-items: center; */
+  flex-direction: column;
+  gap: 15px;
   justify-content: center;
-  /* border: 1px solid #d0ccff; */
+}
+
+.admin-section {
+  display: flex;
 }
 
 .logout-section {
@@ -527,6 +539,14 @@ const closeBookingModal = async () => {
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
+  width: 100%;
+}
+
+.admin-btn {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #FFFFFF;
+  border: none;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
 }
 
 .logout-btn {
