@@ -288,6 +288,26 @@ const handleDeleteMachine = async (machineId: string) => {
   }
 }
 
+// Сегодняшняя дата для фильтрации
+const today = computed(() => toLocalISODate(new Date()))
+
+// Прошедшие расписания (до сегодня)
+const pastSchedules = computed(() => {
+  return [...schedules.value]
+    .filter(s => s.date < today.value)
+    .sort((a, b) => b.date.localeCompare(a.date)) // новые сверху
+})
+
+// Актуальные расписания (сегодня и будущее)
+const upcomingSchedules = computed(() => {
+  return [...schedules.value]
+    .filter(s => s.date >= today.value)
+    .sort((a, b) => a.date.localeCompare(b.date))
+})
+
+// Флаг для показа прошедших расписаний
+const showPastSchedules = ref(false)
+
 // Обработчики расписаний
 const openScheduleForm = (schedule?: AdminSchedule) => {
   if (schedule) {
@@ -310,6 +330,9 @@ const openScheduleForm = (schedule?: AdminSchedule) => {
     }
   }
   showScheduleForm.value = true
+  
+  // Прокручиваем страницу вверх к форме
+  window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
 const toggleMachineInSchedule = (machineId: string) => {
@@ -339,9 +362,6 @@ const handleSaveSchedule = async () => {
   isLoading.value = true
   actionError.value = null
   actionSuccess.value = null
-  
-  console.log('=== handleSaveSchedule ===')
-  console.log('scheduleForm.value =', JSON.parse(JSON.stringify(scheduleForm.value)))
   
   try {
     const response = await fetch('/api/admin/schedules', {
@@ -622,7 +642,7 @@ const scrollToRules = () => {
             Нет машинок
           </div>
 
-          <div v-else class="machines-grid">
+          <div v-else class="machines-list">
             <div v-for="machine in adminMachines" :key="machine.id" class="machine-card">
               <div class="machine-icon">
                 <WashingMachineOutlineIcon :size="50" color="#3D4F61" />
@@ -736,51 +756,105 @@ const scrollToRules = () => {
             Нет настроенных расписаний. По умолчанию все дни открыты для записи.
           </div>
 
-          <div v-else class="schedules-list">
-            <div v-for="schedule in schedules" :key="schedule.id" class="schedule-card">
-              <div class="schedule-icon">
-                <CalendarIcon :size="40" color="#3D4F61" />
-              </div>
-              <div class="schedule-info">
-                <h3 class="schedule-date">{{ formatDate(schedule.date) }}</h3>
-                <span 
-                  class="schedule-status"
-                  :class="{ open: schedule.isOpen, closed: !schedule.isOpen }"
-                >
-                  {{ schedule.isOpen ? 'Записи открыты' : 'Записи закрыты' }}
-                </span>
-                <div class="schedule-machines" v-if="schedule.machineIds.length > 0">
-                  <span class="schedule-machines-label">Машинки:</span>
-                  <span 
-                    v-for="machineId in schedule.machineIds" 
-                    :key="machineId"
-                    class="schedule-machine-tag"
-                  >
-                    {{ getMachineName(machineId) }}
-                  </span>
+          <template v-else>
+            <!-- Прошедшие расписания (свёрнутые) -->
+            <div v-if="pastSchedules.length > 0" class="past-schedules-section">
+              <button 
+                class="past-schedules-toggle"
+                @click="showPastSchedules = !showPastSchedules"
+              >
+                <span class="toggle-icon">{{ showPastSchedules ? '▼' : '▶' }}</span>
+                Прошедшие даты ({{ pastSchedules.length }})
+              </button>
+              
+              <div v-if="showPastSchedules" class="schedules-list past-list">
+                <div v-for="schedule in pastSchedules" :key="schedule.id" class="schedule-card past">
+                  <div class="schedule-icon">
+                    <CalendarIcon :size="40" color="#9CA3AF" />
+                  </div>
+                  <div class="schedule-info">
+                    <h3 class="schedule-date">{{ formatDate(schedule.date) }}</h3>
+                    <span 
+                      class="schedule-status"
+                      :class="{ open: schedule.isOpen, closed: !schedule.isOpen }"
+                    >
+                      {{ schedule.isOpen ? 'Записи открыты' : 'Записи закрыты' }}
+                    </span>
+                    <div class="schedule-machines" v-if="schedule.machineIds.length > 0">
+                      <span class="schedule-machines-label">Машинки:</span>
+                      <span 
+                        v-for="machineId in schedule.machineIds" 
+                        :key="machineId"
+                        class="schedule-machine-tag"
+                      >
+                        {{ getMachineName(machineId) }}
+                      </span>
+                    </div>
+                  </div>
+                  <div class="schedule-actions">
+                    <button 
+                      class="action-btn delete-btn"
+                      @click="handleDeleteSchedule(schedule.id)"
+                    >
+                      <TrashIcon :size="16" color="white" />
+                      Удалить
+                    </button>
+                  </div>
                 </div>
-                <div v-else class="schedule-machines">
-                  <span class="schedule-machines-label">Все машинки недоступны</span>
-                </div>
-              </div>
-              <div class="schedule-actions">
-                <button 
-                  class="action-btn edit-btn"
-                  @click="openScheduleForm(schedule)"
-                >
-                  <EditIcon :size="16" color="white" />
-                  Изменить
-                </button>
-                <button 
-                  class="action-btn delete-btn"
-                  @click="handleDeleteSchedule(schedule.id)"
-                >
-                  <TrashIcon :size="16" color="white" />
-                  Удалить
-                </button>
               </div>
             </div>
-          </div>
+
+            <!-- Актуальные расписания (сегодня и будущее) -->
+            <div v-if="upcomingSchedules.length === 0" class="no-data">
+              Нет актуальных расписаний на ближайшие дни.
+            </div>
+            
+            <div v-else class="schedules-list">
+              <div v-for="schedule in upcomingSchedules" :key="schedule.id" class="schedule-card">
+                <div class="schedule-icon">
+                  <CalendarIcon :size="40" color="#3D4F61" />
+                </div>
+                <div class="schedule-info">
+                  <h3 class="schedule-date">{{ formatDate(schedule.date) }}</h3>
+                  <span 
+                    class="schedule-status"
+                    :class="{ open: schedule.isOpen, closed: !schedule.isOpen }"
+                  >
+                    {{ schedule.isOpen ? 'Записи открыты' : 'Записи закрыты' }}
+                  </span>
+                  <div class="schedule-machines" v-if="schedule.machineIds.length > 0">
+                    <span class="schedule-machines-label">Машинки:</span>
+                    <span 
+                      v-for="machineId in schedule.machineIds" 
+                      :key="machineId"
+                      class="schedule-machine-tag"
+                    >
+                      {{ getMachineName(machineId) }}
+                    </span>
+                  </div>
+                  <div v-else class="schedule-machines">
+                    <span class="schedule-machines-label">Все машинки недоступны</span>
+                  </div>
+                </div>
+                <div class="schedule-actions">
+                  <button 
+                    class="action-btn edit-btn"
+                    @click="openScheduleForm(schedule)"
+                  >
+                    <EditIcon :size="16" color="white" />
+                    Изменить
+                  </button>
+                  <button 
+                    class="action-btn delete-btn"
+                    @click="handleDeleteSchedule(schedule.id)"
+                  >
+                    <TrashIcon :size="16" color="white" />
+                    Удалить
+                  </button>
+                </div>
+              </div>
+            </div>
+          </template>
         </section>
 
         <!-- Users Management -->
@@ -972,10 +1046,10 @@ const scrollToRules = () => {
   font-size: 16px;
 }
 
-.machines-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 20px;
+.machines-list {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
 }
 
 .machine-card {
@@ -1511,6 +1585,52 @@ const scrollToRules = () => {
 
 .edit-btn:hover {
   background: #2563EB;
+}
+
+/* Past Schedules Toggle */
+.past-schedules-section {
+  margin-bottom: 20px;
+}
+
+.past-schedules-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 15px 20px;
+  background: #F3F4F6;
+  border: 2px solid #E5E7EB;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #6B7280;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.past-schedules-toggle:hover {
+  background: #E5E7EB;
+  border-color: #D1D5DB;
+}
+
+.toggle-icon {
+  font-size: 12px;
+  transition: transform 0.2s ease;
+}
+
+.past-list {
+  margin-top: 15px;
+  padding-left: 20px;
+  border-left: 3px solid #E5E7EB;
+}
+
+.schedule-card.past {
+  opacity: 0.7;
+  background: #F9FAFB;
+}
+
+.schedule-card.past .schedule-date {
+  color: #6B7280;
 }
 
 /* Schedules */
